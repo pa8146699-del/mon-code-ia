@@ -4,62 +4,51 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-`mon-code-ia` is a personal AI assistant project. The main component is `jarvis/`, a Python assistant powered by **Groq** (free cloud API, no credit card). It has two interfaces:
+`mon-code-ia` is a personal AI assistant project. The main component is `jarvis/`, a Python assistant powered by **Ollama** (IA locale, gratuite, tourne sur le téléphone via Alpine proot). It has two interfaces:
 
 - `app.py` — Serveur web Flask avec interface chat mobile, accessible depuis le navigateur du téléphone
 - `jarvis.py` — CLI texte (terminal)
 
-## Setup
+## Setup — Termux + Alpine proot (Android)
 
-### 1. Clé API Groq (gratuite)
-Créer un compte sur [console.groq.com](https://console.groq.com) → API Keys → Create.
-
-### 2. Installation
-
-**Termux + Alpine (proot-distro) — setup recommandé sur Android :**
 ```bash
-# — Dans Termux —
-pkg update && pkg install proot-distro git
+# ── 1. Dans Termux ──────────────────────────────────────────────
+pkg update && pkg install proot-distro
 proot-distro install alpine
 proot-distro login alpine
 
-# — Dans Alpine (proot) —
-apk add python3 py3-pip git
+# ── 2. Dans Alpine (proot) ──────────────────────────────────────
+apk add python3 py3-pip git curl
+
+# Installer Ollama (binaire ARM64)
+curl -fsSL https://ollama.com/install.sh | sh
+
+# Lancer Ollama en arrière-plan
+ollama serve &
+
+# Télécharger un modèle (une seule fois)
+ollama pull tinyllama       # ~600 Mo  — téléphones limités
+# ollama pull phi3:mini     # ~2.2 Go  — meilleure qualité
+# ollama pull llama3.2:1b   # ~1.3 Go  — bon équilibre
+
+# Cloner le projet
 git clone https://github.com/pa8146699-del/mon-code-ia
 cd mon-code-ia
-pip3 install flask groq
-export GROQ_API_KEY=gsk_...
+pip3 install flask ollama
+
+# Lancer Jarvis
 python3 jarvis/app.py
 ```
-Puis ouvrir `http://localhost:5000` dans Chrome sur le téléphone.
 
-> Note : OpenRC ne fonctionne pas dans proot. Pour relancer Jarvis automatiquement à l'ouverture de Termux, ajouter la ligne suivante dans `~/.bashrc` ou `~/.profile` de l'Alpine proot :
-> ```bash
-> python3 ~/mon-code-ia/jarvis/app.py &
-> ```
+Ouvrir `http://localhost:5000` dans Chrome → menu ⋮ → **"Ajouter à l'écran d'accueil"**.
 
-**Alpine Linux natif (VM / PC) :**
+Pour relancer automatiquement à chaque ouverture d'Alpine, ajouter dans `~/.profile` :
 ```bash
-sh install-alpine.sh   # installe, configure le service OpenRC, démarre
-```
-La clé API est stockée dans `/etc/conf.d/jarvis` (mode 600).
-
-**Linux/macOS classique :**
-```bash
-pip install -r jarvis/requirements.txt
-export GROQ_API_KEY=gsk_...
-python jarvis/app.py
+ollama serve > /dev/null 2>&1 &
+python3 ~/mon-code-ia/jarvis/app.py &
 ```
 
-## Running
-
-```bash
-# Interface web (ouvrir http://localhost:5000 dans le navigateur)
-python3 jarvis/app.py
-
-# CLI texte
-python3 jarvis/jarvis.py
-```
+## Changer de modèle
 
 ## Installer comme application sur téléphone (PWA)
 
@@ -73,12 +62,12 @@ L'interface web est une Progressive Web App. Dans Chrome sur Android :
 Modifier la constante `MODEL` dans `app.py` ou `jarvis.py` :
 
 ```python
-MODEL = "llama-3.3-70b-versatile"   # qualité maximale (défaut)
-# MODEL = "llama-3.1-8b-instant"    # plus rapide, plus léger
-# MODEL = "mixtral-8x7b-32768"      # bon contexte long
+MODEL = "tinyllama"    # ~600 Mo  — défaut, tourne sur tout téléphone
+# MODEL = "phi3:mini"  # ~2.2 Go  — meilleure qualité, recommandé si ≥ 4 Go RAM
+# MODEL = "llama3.2:1b" # ~1.3 Go  — bon équilibre
 ```
 
-Modèles disponibles : [console.groq.com/docs/models](https://console.groq.com/docs/models)
+`ollama list` pour voir les modèles installés, `ollama pull <nom>` pour en ajouter.
 
 ## Architecture
 
@@ -115,5 +104,5 @@ CLI texte uniquement (pas de voix — compatible Termux/Alpine sans dépendances
 
 | Package | Usage |
 |---|---|
-| `groq` | Client API Groq (IA cloud gratuite) |
+| `ollama` | Client Ollama — IA locale sur le téléphone |
 | `flask` | Serveur web pour `app.py` |

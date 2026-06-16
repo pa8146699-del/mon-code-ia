@@ -1,12 +1,9 @@
 #!/usr/bin/env python3
-"""Jarvis — assistant textuel CLI (Groq, gratuit)."""
+"""Jarvis — assistant textuel CLI (Ollama local, gratuit)."""
 
-import os
-import sys
-from groq import Groq
+import ollama
 
-_client = Groq(api_key=os.environ["GROQ_API_KEY"])
-MODEL   = "llama-3.3-70b-versatile"
+MODEL   = "tinyllama"   # ~600 Mo — changer selon RAM dispo (voir CLAUDE.md)
 _SYSTEM = (
     "Tu es Jarvis, un assistant personnel intelligent, concis et utile. "
     "Réponds en français sauf si l'utilisateur écrit dans une autre langue."
@@ -24,13 +21,12 @@ def read_input() -> str:
 def respond(user_message: str) -> str:
     _history.append({"role": "user", "content": user_message})
 
-    response = _client.chat.completions.create(
+    response = ollama.chat(
         model=MODEL,
         messages=[{"role": "system", "content": _SYSTEM}] + _history,
-        max_tokens=1024,
     )
 
-    reply = response.choices[0].message.content
+    reply = response.message.content
     _history.append({"role": "assistant", "content": reply})
     return reply
 
