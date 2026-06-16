@@ -45,6 +45,7 @@ python jarvis/jarvis.py --voice
 `dataguard/` is a self-contained security toolkit (Python 3 standard library only) exposed through subcommands on `dataguard.py`:
 
 ```bash
+python dataguard/dataguard.py                          # interactive menu (default with no args)
 python dataguard/dataguard.py scan <file-or-dir> [--json|--html FILE] [--strict]
 python dataguard/dataguard.py phishing [--text STR | --file PATH] [--json] [--strict]
 python dataguard/dataguard.py install-hook [--force]
