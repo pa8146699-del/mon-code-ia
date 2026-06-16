@@ -4,80 +4,81 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-`mon-code-ia` is a personal AI assistant project. The main component is `jarvis/`, a Python-based assistant powered by **Ollama** (local AI, free, no API key required). It has two interfaces:
+`mon-code-ia` is a personal AI assistant project. The main component is `jarvis/`, a Python assistant powered by **Groq** (free cloud API, no credit card). It has two interfaces:
 
-- `jarvis.py` — CLI terminal (text or voice via microphone)
-- `app.py` — Web server with a mobile-friendly chat UI accessible from any browser/phone on the same Wi-Fi
+- `app.py` — Serveur web Flask avec interface chat mobile, accessible depuis le navigateur du téléphone
+- `jarvis.py` — CLI texte (terminal)
 
 ## Setup
 
+### 1. Clé API Groq (gratuite)
+Créer un compte sur [console.groq.com](https://console.groq.com) → API Keys → Create.
+
+### 2. Installation
+
+**Termux (Android) :**
 ```bash
-# 1. Installer Ollama — https://ollama.com
-curl -fsSL https://ollama.com/install.sh | sh   # Linux
-# macOS/Windows : télécharger depuis https://ollama.com/download
+pkg update && pkg install python
+pip install flask groq
+export GROQ_API_KEY=gsk_...
+```
 
-# 2. Télécharger le modèle (une seule fois, ~2 Go)
-ollama pull llama3.2
+**Alpine Linux :**
+```bash
+apk add python3 py3-pip
+pip3 install flask groq
+export GROQ_API_KEY=gsk_...
+```
 
-# 3. Installer les dépendances Python
+**Linux/macOS classique :**
+```bash
 pip install -r jarvis/requirements.txt
+export GROQ_API_KEY=gsk_...
 ```
 
 ## Running
 
 ```bash
-# Interface web (téléphone / navigateur)
+# Interface web (ouvrir http://localhost:5000 dans le navigateur)
 python jarvis/app.py
-# → http://localhost:5000  ou  http://<IP-du-PC>:5000 depuis le téléphone
 
 # CLI texte
 python jarvis/jarvis.py
-
-# CLI vocal (microphone + synthèse vocale)
-python jarvis/jarvis.py --voice
 ```
-
-Ollama doit tourner en arrière-plan (automatique après installation, ou `ollama serve`).
 
 ## Changer de modèle
 
 Modifier la constante `MODEL` dans `app.py` ou `jarvis.py` :
 
 ```python
-MODEL = "llama3.2"   # par défaut (~2 Go)
-# MODEL = "mistral"  # ~4 Go
-# MODEL = "phi3"     # très léger
+MODEL = "llama-3.3-70b-versatile"   # qualité maximale (défaut)
+# MODEL = "llama-3.1-8b-instant"    # plus rapide, plus léger
+# MODEL = "mixtral-8x7b-32768"      # bon contexte long
 ```
 
-`ollama list` liste les modèles installés ; `ollama pull <nom>` en télécharge un nouveau.
+Modèles disponibles : [console.groq.com/docs/models](https://console.groq.com/docs/models)
 
 ## Architecture
 
 ### `jarvis/app.py`
-Serveur Flask exposé sur `0.0.0.0:5000`.
+Serveur Flask sur `0.0.0.0:5000`.
 - `GET /` — sert `templates/index.html`
-- `POST /chat` — reçoit `{message}`, appelle Ollama, retourne `{reply}`
-- `POST /reset` — vide l'historique de conversation
+- `POST /chat` — reçoit `{message}`, appelle Groq, retourne `{reply}`
+- `POST /reset` — vide l'historique
 
-L'historique (`_history`) est conservé en mémoire pour toute la session du serveur (global, mono-utilisateur).
+Historique conservé en mémoire (global, mono-utilisateur, réinitialisé au redémarrage du serveur).
 
 ### `jarvis/templates/index.html`
-Interface chat sans dépendance externe (CSS/JS vanilla).
-- Micro via **Web Speech API** du navigateur (Chrome/Edge/Safari)
-- Synthèse vocale via **SpeechSynthesis** du navigateur
-- Bulles de chat, indicateur de frappe animé, bouton "Nouvelle conv."
+Interface chat vanilla (pas de dépendance frontend).
+- Micro et synthèse vocale via **Web Speech API** du navigateur (gratuit, intégré à Chrome/Safari)
+- Bulles de chat, indicateur de frappe, bouton "Nouvelle conv."
 
 ### `jarvis/jarvis.py`
-CLI alternatif (même logique, sans Flask).
-- Mode texte : `read_input()` + `respond()` en boucle
-- Mode vocal (`--voice`) : `listen()` via SpeechRecognition + `speak()` via pyttsx3
+CLI texte uniquement (pas de voix — compatible Termux/Alpine sans dépendances système lourdes).
 
 ### Dependencies
 
 | Package | Usage |
 |---|---|
-| `ollama` | Client Ollama (IA locale gratuite) — obligatoire |
-| `flask` | Serveur web pour `app.py` — obligatoire |
-| `SpeechRecognition` | Micro → texte pour CLI vocal |
-| `pyttsx3` | Texte → parole pour CLI vocal |
-| `PyAudio` | Backend audio pour SpeechRecognition |
+| `groq` | Client API Groq (IA cloud gratuite) |
+| `flask` | Serveur web pour `app.py` |
