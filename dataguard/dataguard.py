@@ -205,15 +205,15 @@ def cmd_menu(args: argparse.Namespace) -> int:
                 print(e)
 
         elif choix == "2":
-            texte = input("Colle le texte/e-mail à vérifier : ").strip()
+            texte = _read_multiline("Colle le texte/e-mail à vérifier")
             if texte:
                 _print_phishing(texte)
 
         elif choix == "3":
-            texte = input("Colle le texte à scanner : ").strip()
+            texte = _read_multiline("Colle le texte à scanner")
             if texte:
                 findings: list[detectors.Finding] = []
-                for i, ligne in enumerate(texte.splitlines() or [texte], start=1):
+                for i, ligne in enumerate(texte.splitlines(), start=1):
                     findings.extend(detectors.scan_line(ligne, i, "(texte)"))
                 print_report(findings)
 
@@ -225,6 +225,21 @@ def cmd_menu(args: argparse.Namespace) -> int:
             print("Choix invalide, tape 1, 2, 3 ou 4.")
 
         input("\nAppuie sur Entrée pour revenir au menu...")
+
+
+def _read_multiline(prompt: str) -> str:
+    """Lit un texte sur plusieurs lignes, terminé par une ligne vide."""
+    print(f"{prompt} (puis une ligne VIDE pour valider) :")
+    lignes: list[str] = []
+    while True:
+        try:
+            ligne = input()
+        except (EOFError, KeyboardInterrupt):
+            break
+        if ligne == "":
+            break
+        lignes.append(ligne)
+    return "\n".join(lignes)
 
 
 def _print_phishing(text: str) -> None:
