@@ -16,19 +16,33 @@ Créer un compte sur [console.groq.com](https://console.groq.com) → API Keys �
 
 ### 2. Installation
 
-**Alpine Linux (avec service au démarrage) :**
+**Termux + Alpine (proot-distro) — setup recommandé sur Android :**
+```bash
+# — Dans Termux —
+pkg update && pkg install proot-distro git
+proot-distro install alpine
+proot-distro login alpine
+
+# — Dans Alpine (proot) —
+apk add python3 py3-pip git
+git clone https://github.com/pa8146699-del/mon-code-ia
+cd mon-code-ia
+pip3 install flask groq
+export GROQ_API_KEY=gsk_...
+python3 jarvis/app.py
+```
+Puis ouvrir `http://localhost:5000` dans Chrome sur le téléphone.
+
+> Note : OpenRC ne fonctionne pas dans proot. Pour relancer Jarvis automatiquement à l'ouverture de Termux, ajouter la ligne suivante dans `~/.bashrc` ou `~/.profile` de l'Alpine proot :
+> ```bash
+> python3 ~/mon-code-ia/jarvis/app.py &
+> ```
+
+**Alpine Linux natif (VM / PC) :**
 ```bash
 sh install-alpine.sh   # installe, configure le service OpenRC, démarre
 ```
-La clé API est stockée dans `/etc/conf.d/jarvis` (mode 600). Le service se nomme `jarvis` (OpenRC).
-
-**Termux (Android) :**
-```bash
-pkg update && pkg install python
-pip install flask groq
-export GROQ_API_KEY=gsk_...
-python jarvis/app.py
-```
+La clé API est stockée dans `/etc/conf.d/jarvis` (mode 600).
 
 **Linux/macOS classique :**
 ```bash
@@ -41,14 +55,10 @@ python jarvis/app.py
 
 ```bash
 # Interface web (ouvrir http://localhost:5000 dans le navigateur)
-python jarvis/app.py
-
-# Service Alpine — gestion
-rc-service jarvis start | stop | restart
-rc-update add jarvis default     # démarrage automatique
+python3 jarvis/app.py
 
 # CLI texte
-python jarvis/jarvis.py
+python3 jarvis/jarvis.py
 ```
 
 ## Installer comme application sur téléphone (PWA)
