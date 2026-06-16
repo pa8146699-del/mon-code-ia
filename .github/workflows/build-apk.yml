@@ -1,0 +1,37 @@
+name: Build APK DataGuard
+
+# Construit l'application Android DataGuard dans le cloud.
+# Déclenche-le manuellement depuis l'onglet "Actions" de GitHub
+# (bouton "Run workflow"), puis télécharge l'APK dans les artéfacts.
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+    paths:
+      - "mobile/**"
+      - ".github/workflows/build-apk.yml"
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Récupérer le code
+        uses: actions/checkout@v4
+
+      - name: Copier la logique DataGuard dans mobile/
+        run: cp dataguard/detectors.py dataguard/phishing.py mobile/
+
+      - name: Construire l'APK avec Buildozer
+        uses: ArtemSBulgakov/buildozer-action@v1
+        with:
+          workdir: mobile
+          command: buildozer android debug
+
+      - name: Publier l'APK en artéfact
+        uses: actions/upload-artifact@v4
+        with:
+          name: dataguard-apk
+          path: mobile/bin/*.apk
+          if-no-files-found: error
