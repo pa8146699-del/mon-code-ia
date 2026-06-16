@@ -30,11 +30,15 @@ fi
 pip3 install --break-system-packages flask ollama groq anthropic 2>/dev/null \
     || pip3 install flask ollama groq anthropic
 
-# Télécharger le modèle IA
-echo "--- Démarrage d'Ollama pour télécharger le modèle $MODEL..."
+# Télécharger les modèles IA (texte + vision pour analyser les images hors-ligne)
+VISION_MODEL="${2:-moondream}"
+echo "--- Démarrage d'Ollama pour télécharger les modèles..."
 ollama serve > /tmp/ollama.log 2>&1 &
 sleep 3
+echo "--- Modèle texte : $MODEL"
 ollama pull "$MODEL"
+echo "--- Modèle vision (images hors-ligne) : $VISION_MODEL"
+ollama pull "$VISION_MODEL" || echo "--- Vision locale ignorée."
 pkill ollama 2>/dev/null || true
 
 # Auto-démarrage à chaque ouverture d'Alpine

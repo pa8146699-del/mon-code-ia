@@ -603,12 +603,9 @@ async function send() {
   }
   userWrap.appendChild(document.createTextNode(text));
 
-  // Une image force un backend qui « voit ». Priorité au gratuit : Groq, puis Claude.
-  let replyBackend = backend;
-  if (imgs.length) {
-    if (groqAvailable)        replyBackend = 'groq';
-    else if (claudeAvailable) replyBackend = 'claude';
-  }
+  // On garde le backend choisi : 📱 local analyse les images hors-ligne (moondream),
+  // ☁️ Groq les analyse en ligne. Le serveur confirmera le backend réel sur 'done'.
+  const replyBackend = backend;
   const replyWrap = mkBubble('assistant', replyBackend);
   const mdEl = replyWrap.querySelector('.md-content');
   let fullText = '';

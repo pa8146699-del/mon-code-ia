@@ -185,16 +185,15 @@ def chat():
 
     sys = _system_prompt()
 
-    # Si une image est envoyée, on bascule sur un backend qui sait « voir ».
-    # Priorité aux options GRATUITES : Groq d'abord, puis Claude, sinon Ollama local.
+    # On respecte le backend choisi (📱 local = 100 % hors-ligne, même les images).
+    # Chaque backend a son propre modèle vision : Ollama→moondream, Groq→llama-4,
+    # Claude→fable-5. Seul cas de bascule : le backend choisi n'est pas dispo.
     has_imgs = _history_has_images(history)
     use = _backend
-    if has_imgs:
-        if _groq:
-            use = "groq"
-        elif _anthropic:
-            use = "claude"
-        # sinon on reste sur Ollama (nécessite un modèle vision, ex: moondream)
+    if use == "groq" and not _groq:
+        use = "claude" if _anthropic else "ollama"
+    elif use == "claude" and not _anthropic:
+        use = "groq" if _groq else "ollama"
 
     def generate():
         full = ""
