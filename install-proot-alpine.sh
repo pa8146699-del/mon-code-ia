@@ -27,8 +27,8 @@ else
 fi
 
 # Dépendances Python
-pip3 install --break-system-packages flask ollama groq anthropic 2>/dev/null \
-    || pip3 install flask ollama groq anthropic
+pip3 install --break-system-packages flask ollama groq anthropic google-generativeai 2>/dev/null \
+    || pip3 install flask ollama groq anthropic google-generativeai
 
 # Télécharger les modèles IA (texte + vision pour analyser les images hors-ligne)
 VISION_MODEL="${2:-moondream}"

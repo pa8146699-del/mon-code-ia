@@ -62,6 +62,7 @@
     }
     .back-btn.on-local  { background: var(--border); color: var(--accent); }
     .back-btn.on-groq   { background: #4c1d95; color: var(--groq); }
+    .back-btn.on-gemini { background: #14532d; color: #4ade80; }
     .back-btn.on-claude { background: #7c2d12; color: #fb923c; }
     .back-btn:disabled  { opacity: .3; cursor: not-allowed; }
 
@@ -101,6 +102,7 @@
     }
     .label-local  { color: var(--accent); }
     .label-groq   { color: var(--groq); }
+    .label-gemini { color: #4ade80; }
     .label-claude { color: #fb923c; }
 
     /* Images dans les bulles */
@@ -297,6 +299,8 @@
     <button class="back-btn on-local" id="btn-local" onclick="switchBackend('ollama')">📱</button>
     <button class="back-btn" id="btn-groq" onclick="switchBackend('groq')"
       {% if not groq_available %}disabled title="GROQ_API_KEY manquante"{% endif %}>☁️</button>
+    <button class="back-btn" id="btn-gemini" onclick="switchBackend('gemini')"
+      {% if not gemini_available %}disabled title="GEMINI_API_KEY manquante"{% endif %}>♊</button>
     <button class="back-btn" id="btn-claude" onclick="switchBackend('claude')"
       {% if not claude_available %}disabled title="ANTHROPIC_API_KEY manquante"{% endif %}>👁️</button>
   </div>
@@ -368,6 +372,14 @@
       <option value="llama-3.3-70b-versatile">llama-3.3-70b — Qualité max</option>
       <option value="llama-3.1-8b-instant">llama-3.1-8b — Rapide</option>
       <option value="mixtral-8x7b-32768">mixtral-8x7b — Long contexte</option>
+    </select>
+  </div>
+  <div>
+    <div class="s-label">♊ Modèle Gemini (GRATUIT — sans limite de tokens)</div>
+    <select class="s-select" id="s-gemini">
+      <option value="gemini-2.0-flash">Gemini 2.0 Flash — rapide, gratuit ✅</option>
+      <option value="gemini-1.5-flash">Gemini 1.5 Flash — stable</option>
+      <option value="gemini-1.5-pro">Gemini 1.5 Pro — + puissant</option>
     </select>
   </div>
   <div>
@@ -513,9 +525,10 @@ async function switchBackend(b) {
   setBackendButtons(b);
 }
 function setBackendButtons(b) {
-  document.getElementById('btn-local').className  = 'back-btn' + (b==='ollama' ? ' on-local'  : '');
-  document.getElementById('btn-groq').className   = 'back-btn' + (b==='groq'   ? ' on-groq'   : '');
-  document.getElementById('btn-claude').className = 'back-btn' + (b==='claude' ? ' on-claude' : '');
+  document.getElementById('btn-local').className  = 'back-btn' + (b==='ollama'  ? ' on-local'  : '');
+  document.getElementById('btn-groq').className   = 'back-btn' + (b==='groq'    ? ' on-groq'   : '');
+  document.getElementById('btn-gemini').className = 'back-btn' + (b==='gemini'  ? ' on-gemini' : '');
+  document.getElementById('btn-claude').className = 'back-btn' + (b==='claude'  ? ' on-claude' : '');
 }
 
 // ── Chat + Streaming ──────────────────────────────────────────────────────────
@@ -532,6 +545,7 @@ function scrollBottom() { const v = document.getElementById('view-chat'); v.scro
 
 const BACKEND_LABEL = {
   groq:   { cls: 'label-groq',   txt: 'JARVIS — GROQ ☁️' },
+  gemini: { cls: 'label-gemini', txt: 'JARVIS — GEMINI ♊' },
   claude: { cls: 'label-claude', txt: 'JARVIS — VISION 👁️' },
   ollama: { cls: 'label-local',  txt: 'JARVIS — LOCAL 📱' },
 };
@@ -784,6 +798,7 @@ async function loadSettings() {
   document.getElementById('s-ollama-vision').value = s.ollama_vision_model;
   document.getElementById('s-groq').value          = s.groq_model;
   document.getElementById('s-groq-vision').value   = s.groq_vision_model;
+  document.getElementById('s-gemini').value        = s.gemini_model;
   document.getElementById('s-claude').value        = s.claude_model;
   document.getElementById('s-prompt').value         = s.system_prompt;
   voiceOn = s.voice_enabled;
@@ -795,6 +810,7 @@ async function saveSettings() {
     ollama_vision_model:  document.getElementById('s-ollama-vision').value,
     groq_model:           document.getElementById('s-groq').value,
     groq_vision_model:    document.getElementById('s-groq-vision').value,
+    gemini_model:         document.getElementById('s-gemini').value,
     claude_model:         document.getElementById('s-claude').value,
     system_prompt:        document.getElementById('s-prompt').value,
     voice_enabled:        document.getElementById('s-voice').classList.contains('on'),

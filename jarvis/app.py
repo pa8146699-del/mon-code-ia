@@ -19,9 +19,10 @@ PINS_FILE     = DATA / "pins.json"
 
 DEFAULT_SETTINGS = {
     "ollama_model":         "phi3:mini",
-    "ollama_vision_model":  "moondream",                                  # vision locale gratuite (~1.7 Go)
+    "ollama_vision_model":  "moondream",
     "groq_model":           "llama-3.3-70b-versatile",
-    "groq_vision_model":    "meta-llama/llama-4-scout-17b-16e-instruct",  # vision Groq gratuite
+    "groq_vision_model":    "meta-llama/llama-4-scout-17b-16e-instruct",
+    "gemini_model":         "gemini-2.0-flash",                           # gratuit, pas de limite tokens/jour
     "claude_model":         "claude-fable-5",
     "system_prompt": (
         "Tu es Jarvis, un assistant personnel intelligent, concis et utile. "
@@ -90,6 +91,21 @@ def _groq_msgs(history):
             out.append({"role": m["role"], "content": m["content"]})
     return out
 
+def _gemini_contents(history, sys_prompt):
+    """Gemini : liste de {role, parts} avec images inline."""
+    import base64
+    contents = []
+    for m in history:
+        parts = []
+        if m.get("images"):
+            for u in m["images"]:
+                media, data = _parse_data_url(u)
+                parts.append({"inline_data": {"mime_type": media, "data": data}})
+        parts.append({"text": m["content"] or "."})
+        role = "user" if m["role"] == "user" else "model"
+        contents.append({"role": role, "parts": parts})
+    return contents
+
 def _claude_msgs(history):
     """Anthropic : blocs image base64 + texte."""
     out = []
@@ -143,6 +159,12 @@ if os.environ.get("ANTHROPIC_API_KEY"):
     import anthropic
     _anthropic = anthropic.Anthropic(api_key=os.environ["ANTHROPIC_API_KEY"])
 
+_gemini = None
+if os.environ.get("GEMINI_API_KEY"):
+    import google.generativeai as genai
+    genai.configure(api_key=os.environ["GEMINI_API_KEY"])
+    _gemini = genai
+
 # ── Routes ────────────────────────────────────────────────────────────────────
 
 @app.route("/")
@@ -150,6 +172,7 @@ def index():
     sess = _sessions.get(_current, {})
     return render_template("index.html",
                            groq_available=_groq is not None,
+                           gemini_available=_gemini is not None,
                            claude_available=_anthropic is not None,
                            settings=_settings,
                            current_session=sess,
@@ -191,14 +214,31 @@ def chat():
     has_imgs = _history_has_images(history)
     use = _backend
     if use == "groq" and not _groq:
-        use = "claude" if _anthropic else "ollama"
+        use = "gemini" if _gemini else ("claude" if _anthropic else "ollama")
+    elif use == "gemini" and not _gemini:
+        use = "groq" if _groq else ("claude" if _anthropic else "ollama")
     elif use == "claude" and not _anthropic:
-        use = "groq" if _groq else "ollama"
+        use = "gemini" if _gemini else ("groq" if _groq else "ollama")
 
     def generate():
         full = ""
         try:
-            if use == "claude" and _anthropic:
+            if use == "gemini" and _gemini:
+                model_obj = _gemini.GenerativeModel(
+                    model_name=_settings["gemini_model"],
+                    system_instruction=sys,
+                )
+                stream = model_obj.generate_content(
+                    _gemini_contents(history, sys),
+                    stream=True,
+                    generation_config={"max_output_tokens": 4096},
+                )
+                for chunk in stream:
+                    tok = chunk.text if hasattr(chunk, "text") else ""
+                    if tok:
+                        full += tok
+                        yield _sse({"token": tok})
+            elif use == "claude" and _anthropic:
                 with _anthropic.messages.stream(
                     model=_settings["claude_model"],
                     max_tokens=4096,
@@ -407,6 +447,8 @@ def set_backend():
     b = (request.get_json() or {}).get("backend", "ollama")
     if b == "groq" and not _groq:
         return jsonify({"error": "GROQ_API_KEY non définie"}), 400
+    if b == "gemini" and not _gemini:
+        return jsonify({"error": "GEMINI_API_KEY non définie"}), 400
     if b == "claude" and not _anthropic:
         return jsonify({"error": "ANTHROPIC_API_KEY non définie"}), 400
     _backend = b
@@ -419,6 +461,6 @@ def service_worker():
     return resp
 
 if __name__ == "__main__":
-    mode = "Ollama" + (" + Groq" if _groq else "") + (" + Claude 👁" if _anthropic else "")
+    mode = "Ollama" + (" + Groq" if _groq else "") + (" + Gemini ♊" if _gemini else "") + (" + Claude" if _anthropic else "")
     print(f"Jarvis démarré ({mode}) → http://localhost:5000\n")
     app.run(host="0.0.0.0", port=5000, debug=False)
