@@ -75,7 +75,7 @@ class DataGuardLayout(BoxLayout):
 
         self.add_widget(
             Label(
-                text="[b]🛡️ DataGuard[/b]",
+                text="[b]DataGuard[/b]",
                 markup=True,
                 font_size="26sp",
                 size_hint_y=None,
@@ -97,9 +97,9 @@ class DataGuardLayout(BoxLayout):
         self.add_widget(self.input)
 
         buttons = BoxLayout(size_hint_y=None, height="56dp", spacing=10)
-        scan_btn = Button(text="🔍 Scanner les secrets", background_color=(0.2, 0.5, 0.8, 1))
+        scan_btn = Button(text="Scanner les secrets", background_color=(0.2, 0.5, 0.8, 1))
         scan_btn.bind(on_release=self.on_scan)
-        phish_btn = Button(text="🎣 Analyser phishing", background_color=(0.8, 0.4, 0.1, 1))
+        phish_btn = Button(text="Analyser phishing", background_color=(0.8, 0.4, 0.1, 1))
         phish_btn.bind(on_release=self.on_phishing)
         buttons.add_widget(scan_btn)
         buttons.add_widget(phish_btn)
