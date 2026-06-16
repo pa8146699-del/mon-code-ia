@@ -17,36 +17,19 @@ pkg update && pkg install proot-distro
 proot-distro install alpine
 proot-distro login alpine
 
-# ── 2. Dans Alpine (proot) ──────────────────────────────────────
-apk add python3 py3-pip git curl
-
-# Installer Ollama (binaire ARM64)
-curl -fsSL https://ollama.com/install.sh | sh
-
-# Lancer Ollama en arrière-plan
-ollama serve &
-
-# Télécharger un modèle (une seule fois)
-ollama pull tinyllama       # ~600 Mo  — téléphones limités
-# ollama pull phi3:mini     # ~2.2 Go  — meilleure qualité
-# ollama pull llama3.2:1b   # ~1.3 Go  — bon équilibre
-
-# Cloner le projet
-git clone https://github.com/pa8146699-del/mon-code-ia
-cd mon-code-ia
-pip3 install flask ollama
-
-# Lancer Jarvis
-python3 jarvis/app.py
+# ── 2. Dans Alpine (proot) — installation en une commande ───────
+apk add curl git
+curl -fsSL https://raw.githubusercontent.com/pa8146699-del/mon-code-ia/main/install-proot-alpine.sh | sh
 ```
 
-Ouvrir `http://localhost:5000` dans Chrome → menu ⋮ → **"Ajouter à l'écran d'accueil"**.
+Le script installe Ollama, clone le projet, télécharge le modèle et configure l'**auto-démarrage** dans `~/.profile`. Après ça, chaque ouverture d'Alpine lance Jarvis automatiquement.
 
-Pour relancer automatiquement à chaque ouverture d'Alpine, ajouter dans `~/.profile` :
+**Lancement manuel :**
 ```bash
-ollama serve > /dev/null 2>&1 &
-python3 ~/mon-code-ia/jarvis/app.py &
+sh ~/mon-code-ia/start.sh
 ```
+
+Ouvrir `http://localhost:5000` dans Chrome → menu ⋮ → **"Ajouter à l'écran d'accueil"** → Jarvis s'installe comme une vraie app.
 
 ## Changer de modèle
 
@@ -94,8 +77,14 @@ Interface chat vanilla (pas de dépendance frontend). PWA installable.
 Script OpenRC pour Alpine. Installé dans `/etc/init.d/jarvis` par `install-alpine.sh`.
 Lit la clé API depuis `/etc/conf.d/jarvis`.
 
+### `start.sh`
+Lance Ollama (s'il n'est pas déjà actif) + télécharge le modèle si absent + démarre `app.py`. Point d'entrée unique pour tout démarrer.
+
+### `install-proot-alpine.sh`
+Installation clé-en-main dans Alpine proot : installe Ollama, clone le projet, tire le modèle, configure l'auto-démarrage dans `~/.profile`.
+
 ### `install-alpine.sh`
-Script d'installation clé-en-main pour Alpine : installe les dépendances, copie les fichiers dans `/opt/jarvis`, configure et démarre le service OpenRC.
+Script d'installation pour Alpine natif (VM/PC) avec service OpenRC.
 
 ### `jarvis/jarvis.py`
 CLI texte uniquement (pas de voix — compatible Termux/Alpine sans dépendances système lourdes).
