@@ -4,12 +4,13 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-`mon-code-ia` is a personal Python toolkit with two independent components:
+`mon-code-ia` is a personal Python toolkit with three components:
 
 - `jarvis/` — a vocal/text assistant powered by the Claude API.
-- `dataguard/` — a command-line data-leak scanner (no external dependencies).
+- `dataguard/` — a command-line data-leak / phishing security toolkit (no external dependencies).
+- `mobile/` — a Kivy GUI wrapper around DataGuard, built into an Android APK by GitHub Actions.
 
-The two components share no code and can be run separately.
+`jarvis/` and `dataguard/` share no code. `mobile/` reuses `dataguard/detectors.py` and `dataguard/phishing.py` (copied in at build time, never committed under `mobile/`).
 
 ## Setup
 
@@ -65,6 +66,14 @@ Tests live in `dataguard/test_dataguard.py` and import the modules by name, so r
 python -m pytest dataguard/        # if pytest is installed
 cd dataguard && python test_dataguard.py   # zero-dependency fallback runner
 ```
+
+## Mobile app (`mobile/`)
+
+`mobile/main.py` is a Kivy GUI exposing DataGuard's two text-based features (secret scan + phishing analysis) for touch use. It imports `detectors` and `phishing` by bare name; those files live in `dataguard/` and are **copied into `mobile/` at build time** by `.github/workflows/build-apk.yml` (they are git-ignored under `mobile/` to avoid drift — the single source of truth stays in `dataguard/`).
+
+- Build: the `Build APK DataGuard` GitHub Actions workflow (manual `workflow_dispatch`, or on push touching `mobile/`) runs Buildozer via `ArtemSBulgakov/buildozer-action@v1` and uploads the `.apk` as the `dataguard-apk` artifact. **APKs are built in CI, not locally** (Buildozer can't run on a phone, and a local build needs the Android SDK/NDK).
+- Config lives in `mobile/buildozer.spec` (`requirements = python3,kivy`).
+- Local UI test: `pip install kivy`, copy the two modules in, then `python mobile/main.py`.
 
 ## Dependencies
 

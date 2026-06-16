@@ -2,3 +2,12 @@ __pycache__/
 *.pyc
 .venv/
 venv/
+
+# Artéfacts de build Android (Buildozer)
+mobile/.buildozer/
+mobile/bin/
+*.apk
+
+# Copies de la logique faites au build (jamais versionnées)
+mobile/detectors.py
+mobile/phishing.py
