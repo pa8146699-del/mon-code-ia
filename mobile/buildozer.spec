@@ -28,6 +28,9 @@ android.api = 34
 android.minapi = 24
 android.archs = arm64-v8a, armeabi-v7a
 
+# Accepter automatiquement les licences du SDK Android (indispensable en CI)
+android.accept_sdk_license = True
+
 # Autoriser la sauvegarde
 android.allow_backup = 1
 
