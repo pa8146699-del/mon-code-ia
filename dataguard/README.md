@@ -10,6 +10,16 @@ trois fonctions :
 3. **install-hook** — installe un hook git qui bloque les commits contenant
    des secrets.
 
+## Menu interactif (le plus simple)
+
+Lance DataGuard **sans argument** pour ouvrir un menu : tu tapes juste `1`,
+`2`, `3` ou `4`. Idéal au doigt sur téléphone.
+
+```bash
+python dataguard/dataguard.py        # ouvre le menu
+python dataguard/dataguard.py menu   # équivalent explicite
+```
+
 ## Sous-commande `scan`
 
 ```bash

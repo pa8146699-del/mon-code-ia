@@ -96,11 +96,7 @@ def cmd_phishing(args: argparse.Namespace) -> int:
             )
         )
     else:
-        print(f"Risque d'hameçonnage : {level} (score {score}/100)\n")
-        if not signals:
-            print("✓ Aucun indice d'hameçonnage relevé.")
-        for s in signals:
-            print(f"  • [{s.category}] {s.detail}")
+        _print_phishing(text)
 
     if args.strict and level in {"MOYEN", "ÉLEVÉ"}:
         return 1
@@ -178,6 +174,69 @@ def cmd_scan_staged(args: argparse.Namespace) -> int:
     return 0
 
 
+# --- Sous-commande : menu interactif --------------------------------------
+
+MENU = """
+========== 🛡️  DataGuard ==========
+  1) Scanner un fichier / dossier
+  2) Analyser un texte (phishing)
+  3) Scanner un texte collé (secrets)
+  4) Quitter
+===================================="""
+
+
+def cmd_menu(args: argparse.Namespace) -> int:
+    """Menu interactif, pratique au doigt sur téléphone."""
+    while True:
+        print(MENU)
+        try:
+            choix = input("Ton choix (1-4) : ").strip()
+        except (EOFError, KeyboardInterrupt):
+            print("\nAu revoir !")
+            return 0
+
+        if choix == "1":
+            cible = input("Chemin du fichier ou dossier : ").strip()
+            if not cible:
+                continue
+            try:
+                print_report(detectors.scan(Path(cible)))
+            except FileNotFoundError as e:
+                print(e)
+
+        elif choix == "2":
+            texte = input("Colle le texte/e-mail à vérifier : ").strip()
+            if texte:
+                _print_phishing(texte)
+
+        elif choix == "3":
+            texte = input("Colle le texte à scanner : ").strip()
+            if texte:
+                findings: list[detectors.Finding] = []
+                for i, ligne in enumerate(texte.splitlines() or [texte], start=1):
+                    findings.extend(detectors.scan_line(ligne, i, "(texte)"))
+                print_report(findings)
+
+        elif choix in {"4", "q", "quitter", "quit", "exit"}:
+            print("Au revoir !")
+            return 0
+
+        else:
+            print("Choix invalide, tape 1, 2, 3 ou 4.")
+
+        input("\nAppuie sur Entrée pour revenir au menu...")
+
+
+def _print_phishing(text: str) -> None:
+    """Affiche le rapport d'hameçonnage d'un texte (partagé menu/CLI)."""
+    score, signals = phishing.analyze(text)
+    print(f"\nRisque d'hameçonnage : {phishing.risk_level(score)} (score {score}/100)\n")
+    if not signals:
+        print("✓ Aucun indice d'hameçonnage relevé.")
+    for s in signals:
+        print(f"  • [{s.category}] {s.detail}")
+
+
 # --- Analyseur d'arguments -------------------------------------------------
 
 def build_parser() -> argparse.ArgumentParser:
@@ -185,7 +244,11 @@ def build_parser() -> argparse.ArgumentParser:
         prog="dataguard",
         description="Boîte à outils anti-fuite de données et anti-phishing.",
     )
-    sub = parser.add_subparsers(dest="command", required=True)
+    # Pas de sous-commande → menu interactif (pratique sur téléphone).
+    sub = parser.add_subparsers(dest="command", required=False)
+
+    p_menu = sub.add_parser("menu", help="Menu interactif (mode par défaut)")
+    p_menu.set_defaults(func=cmd_menu)
 
     p_scan = sub.add_parser("scan", help="Analyse un fichier ou un dossier")
     p_scan.add_argument("target", help="Fichier ou dossier à analyser")
@@ -216,6 +279,9 @@ def build_parser() -> argparse.ArgumentParser:
 def main() -> int:
     parser = build_parser()
     args = parser.parse_args()
+    # Sans sous-commande, on lance le menu interactif.
+    if getattr(args, "func", None) is None:
+        return cmd_menu(args)
     return args.func(args)
 
 
