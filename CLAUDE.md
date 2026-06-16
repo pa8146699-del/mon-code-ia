@@ -4,7 +4,12 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-`mon-code-ia` is a personal AI assistant project. The main component is `jarvis/`, a Python-based vocal/text assistant powered by the Claude API.
+`mon-code-ia` is a personal Python toolkit with two independent components:
+
+- `jarvis/` — a vocal/text assistant powered by the Claude API.
+- `dataguard/` — a command-line data-leak scanner (no external dependencies).
+
+The two components share no code and can be run separately.
 
 ## Setup
 
@@ -33,6 +38,31 @@ python jarvis/jarvis.py --voice
 - **Language**: the system prompt instructs Claude to reply in French by default, switching to the user's language if they write in another one.
 - **Exit keywords**: `"quitter"`, `"stop"`, `"exit"`, `"quit"` (checked case-insensitively) terminate the loop.
 - `ANTHROPIC_API_KEY` is read directly from the environment via `os.environ["ANTHROPIC_API_KEY"]` — it will raise `KeyError` if unset.
+
+## DataGuard
+
+`dataguard/dataguard.py` is a self-contained CLI that scans a file or directory for sensitive data (API keys, passwords, e-mails, credit card numbers, IPs…) to prevent leaks before sharing or committing.
+
+```bash
+python dataguard/dataguard.py <file-or-dir>          # human-readable report
+python dataguard/dataguard.py <file-or-dir> --json   # machine-readable output
+python dataguard/dataguard.py <file-or-dir> --strict # exit 1 on any finding (CI)
+```
+
+Design points:
+
+- **No external dependencies** — Python 3 standard library only.
+- Detection is **regex-driven** via the `DETECTORS` list; add a new `Detector(name, compiled_regex, severity)` entry to extend coverage.
+- Credit-card matches are confirmed with the **Luhn checksum** (`luhn_valid`) to cut false positives.
+- Reported values are **redacted** (`redact`) so secrets are never re-printed in full.
+- `.git`, `node_modules`, `__pycache__`, `venv`/`.venv` and common binary extensions are skipped during directory scans.
+
+Tests live in `dataguard/test_dataguard.py`:
+
+```bash
+python -m pytest dataguard/        # if pytest is installed
+python dataguard/test_dataguard.py # zero-dependency fallback runner
+```
 
 ## Dependencies
 
