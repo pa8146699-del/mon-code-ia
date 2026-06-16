@@ -211,12 +211,25 @@ def chat():
                             yield _sse({"token": tok})
             elif use == "groq" and _groq:
                 model = _settings["groq_vision_model"] if has_imgs else _settings["groq_model"]
-                stream = _groq.chat.completions.create(
-                    model=model,
-                    messages=[{"role": "system", "content": sys}] + _groq_msgs(history),
-                    max_tokens=2048,
-                    stream=True,
-                )
+                fallback = "llama-3.1-8b-instant"
+                try:
+                    stream = _groq.chat.completions.create(
+                        model=model,
+                        messages=[{"role": "system", "content": sys}] + _groq_msgs(history),
+                        max_tokens=2048,
+                        stream=True,
+                    )
+                except Exception as e_groq:
+                    if "rate_limit" in str(e_groq).lower() or "429" in str(e_groq) and model != fallback:
+                        yield _sse({"token": f"⚠️ Limite Groq atteinte sur {model}, bascule sur {fallback}…\n\n"})
+                        stream = _groq.chat.completions.create(
+                            model=fallback,
+                            messages=[{"role": "system", "content": sys}] + _groq_msgs(history),
+                            max_tokens=2048,
+                            stream=True,
+                        )
+                    else:
+                        raise
                 for chunk in stream:
                     tok = (chunk.choices[0].delta.content or "")
                     if tok:
@@ -244,6 +257,9 @@ def chat():
                 m = _settings["ollama_vision_model"] if has_imgs else _settings["ollama_model"]
                 msg_err = (f"Le modèle local « {m} » n'est pas téléchargé. "
                            f"Avec internet, lance : ollama pull {m}")
+            elif "rate_limit" in low or ("429" in msg_err and use == "groq"):
+                msg_err = ("Limite Groq atteinte (100 000 tokens/jour). "
+                           "Attends 1h ou change de modèle dans ⚙️ Réglages → llama-3.1-8b-instant (500k/jour).")
             yield _sse({"error": msg_err})
             history.pop()
             return
