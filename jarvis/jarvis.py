@@ -1,12 +1,11 @@
 #!/usr/bin/env python3
-"""Jarvis — assistant vocal/textuel propulsé par Claude."""
+"""Jarvis — assistant vocal/textuel local propulsé par Ollama (gratuit)."""
 
-import os
 import sys
-
-import anthropic
+import ollama
 
 VOICE_MODE = "--voice" in sys.argv
+MODEL = "llama3.2"
 
 if VOICE_MODE:
     import pyttsx3
@@ -15,8 +14,12 @@ if VOICE_MODE:
     _recognizer = sr.Recognizer()
     _engine = pyttsx3.init()
 
-_client = anthropic.Anthropic(api_key=os.environ["ANTHROPIC_API_KEY"])
 _history: list[dict] = []
+
+_SYSTEM = (
+    "Tu es Jarvis, un assistant personnel intelligent, concis et utile. "
+    "Réponds en français sauf si l'utilisateur écrit dans une autre langue."
+)
 
 
 def listen() -> str:
@@ -51,26 +54,21 @@ def speak(text: str) -> None:
 
 
 def respond(user_message: str) -> str:
-    """Envoie le message à Claude et retourne la réponse."""
+    """Envoie le message au modèle local et retourne la réponse."""
     _history.append({"role": "user", "content": user_message})
 
-    response = _client.messages.create(
-        model="claude-sonnet-4-6",
-        max_tokens=1024,
-        system=(
-            "Tu es Jarvis, un assistant personnel intelligent, concis et utile. "
-            "Réponds en français sauf si l'utilisateur écrit dans une autre langue."
-        ),
-        messages=_history,
+    response = ollama.chat(
+        model=MODEL,
+        messages=[{"role": "system", "content": _SYSTEM}] + _history,
     )
 
-    reply = response.content[0].text
+    reply = response.message.content
     _history.append({"role": "assistant", "content": reply})
     return reply
 
 
 def main() -> None:
-    print("Jarvis démarré. Tapez 'quitter' ou dites 'stop' pour arrêter.\n")
+    print(f"Jarvis démarré (modèle : {MODEL}). Tapez 'quitter' pour arrêter.\n")
 
     get_input = listen if VOICE_MODE else read_input
 
