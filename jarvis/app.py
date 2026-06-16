@@ -3,6 +3,7 @@
 
 import json
 import os
+from datetime import datetime
 from pathlib import Path
 
 from flask import Flask, jsonify, render_template, request, send_from_directory
@@ -18,9 +19,8 @@ _SYSTEM = (
     "Tu es Jarvis, un assistant personnel intelligent, concis et utile. "
     "Réponds en français sauf si l'utilisateur écrit dans une autre langue."
 )
-_backend = "ollama"  # "ollama" | "groq"
+_backend = "ollama"
 
-# Client Groq optionnel (actif uniquement si GROQ_API_KEY est défini)
 _groq = None
 if os.environ.get("GROQ_API_KEY"):
     from groq import Groq
@@ -39,14 +39,23 @@ def _save_history(history: list[dict]) -> None:
     HISTORY_FILE.write_text(json.dumps(history, ensure_ascii=False, indent=2))
 
 
+def _ai_messages(history: list[dict]) -> list[dict]:
+    """Retourne l'historique sans les timestamps (format attendu par les APIs)."""
+    return [{"role": m["role"], "content": m["content"]} for m in history]
+
+
 _history: list[dict] = _load_history()
 
 
 @app.route("/")
 def index():
-    return render_template("index.html",
-                           groq_available=_groq is not None,
+    return render_template("index.html", groq_available=_groq is not None,
                            history=_history)
+
+
+@app.route("/history")
+def get_history():
+    return jsonify(_history)
 
 
 @app.route("/backend", methods=["POST"])
@@ -66,23 +75,24 @@ def chat():
     if not user_message:
         return jsonify({"error": "Message vide"}), 400
 
-    _history.append({"role": "user", "content": user_message})
+    ts = datetime.now().strftime("%Y-%m-%dT%H:%M:%S")
+    _history.append({"role": "user", "content": user_message, "ts": ts})
 
     if _backend == "groq" and _groq:
         response = _groq.chat.completions.create(
             model=GROQ_MODEL,
-            messages=[{"role": "system", "content": _SYSTEM}] + _history,
+            messages=[{"role": "system", "content": _SYSTEM}] + _ai_messages(_history),
             max_tokens=1024,
         )
         reply = response.choices[0].message.content
     else:
         response = ollama.chat(
             model=OLLAMA_MODEL,
-            messages=[{"role": "system", "content": _SYSTEM}] + _history,
+            messages=[{"role": "system", "content": _SYSTEM}] + _ai_messages(_history),
         )
         reply = response.message.content
 
-    _history.append({"role": "assistant", "content": reply})
+    _history.append({"role": "assistant", "content": reply, "ts": datetime.now().strftime("%Y-%m-%dT%H:%M:%S")})
     _save_history(_history)
     return jsonify({"reply": reply, "backend": _backend})
 

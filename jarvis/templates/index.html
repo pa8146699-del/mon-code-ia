@@ -39,7 +39,6 @@
 
     .header-right { display: flex; gap: 6px; align-items: center; }
 
-    /* Toggle local / groq */
     #backend-toggle {
       display: flex;
       border-radius: 20px;
@@ -58,7 +57,6 @@
       transition: background 0.2s, color 0.2s;
       white-space: nowrap;
     }
-
     .backend-btn.active-ollama { background: #1e3a5f; color: #38bdf8; }
     .backend-btn.active-groq   { background: #4c1d95; color: #a78bfa; }
     .backend-btn:disabled      { opacity: 0.35; cursor: not-allowed; }
@@ -74,14 +72,42 @@
       white-space: nowrap;
     }
 
-    #messages {
+    /* ── Tab bar ── */
+    #tab-bar {
+      display: flex;
+      background: #111827;
+      border-bottom: 1px solid #1e3a5f;
+      flex-shrink: 0;
+    }
+
+    .tab {
+      flex: 1;
+      padding: 10px;
+      text-align: center;
+      font-size: 0.82rem;
+      font-weight: 600;
+      color: #6b7280;
+      cursor: pointer;
+      border-bottom: 2px solid transparent;
+      transition: color 0.2s, border-color 0.2s;
+    }
+    .tab.active { color: #38bdf8; border-bottom-color: #38bdf8; }
+
+    /* ── Views ── */
+    #view-chat, #view-history {
       flex: 1;
       overflow-y: auto;
+      -webkit-overflow-scrolling: touch;
+    }
+    #view-history { display: none; }
+
+    /* ── Chat bubbles ── */
+    #messages {
       padding: 14px 12px;
       display: flex;
       flex-direction: column;
       gap: 10px;
-      -webkit-overflow-scrolling: touch;
+      min-height: 100%;
     }
 
     .bubble {
@@ -93,14 +119,12 @@
       white-space: pre-wrap;
       word-wrap: break-word;
     }
-
     .bubble.user {
       background: #1e40af;
       color: #e0e0e0;
       align-self: flex-end;
       border-bottom-right-radius: 5px;
     }
-
     .bubble.jarvis {
       background: #111827;
       color: #e0e0e0;
@@ -108,27 +132,21 @@
       border-bottom-left-radius: 5px;
       border: 1px solid #1e3a5f;
     }
-
     .bubble.jarvis.from-groq { border-color: #4c1d95; }
 
-    .bubble.jarvis .label {
+    .bubble .label {
       font-size: 0.68rem;
       font-weight: 700;
       letter-spacing: 0.08em;
       margin-bottom: 5px;
     }
-
     .label-ollama { color: #38bdf8; }
     .label-groq   { color: #a78bfa; }
 
-    .typing {
-      display: flex; gap: 5px; align-items: center;
-      padding: 14px 16px;
-    }
+    .typing { display: flex; gap: 5px; align-items: center; padding: 14px 16px; }
     .typing span {
       width: 7px; height: 7px; border-radius: 50%;
-      background: #38bdf8;
-      animation: bounce 1.2s infinite;
+      background: #38bdf8; animation: bounce 1.2s infinite;
     }
     .typing span:nth-child(2) { animation-delay: 0.2s; }
     .typing span:nth-child(3) { animation-delay: 0.4s; }
@@ -138,6 +156,51 @@
       30% { transform: translateY(-6px); opacity: 1; }
     }
 
+    /* ── History view ── */
+    #history-list {
+      padding: 12px;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    .hist-date {
+      font-size: 0.7rem;
+      color: #4b5563;
+      text-align: center;
+      padding: 10px 0 4px;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+    }
+
+    .hist-msg {
+      padding: 9px 13px;
+      border-radius: 14px;
+      font-size: 0.88rem;
+      line-height: 1.5;
+      white-space: pre-wrap;
+      word-wrap: break-word;
+      max-width: 88%;
+    }
+    .hist-msg.user   { background: #1e3a5f; align-self: flex-end; color: #cbd5e1; }
+    .hist-msg.jarvis { background: #111827; border: 1px solid #1e3a5f; align-self: flex-start; color: #e0e0e0; }
+
+    .hist-time {
+      font-size: 0.65rem;
+      color: #6b7280;
+      margin-top: 2px;
+      padding: 0 4px;
+    }
+    .hist-time.right { text-align: right; align-self: flex-end; }
+
+    #history-empty {
+      text-align: center;
+      color: #4b5563;
+      padding: 60px 20px;
+      font-size: 0.9rem;
+    }
+
+    /* ── Input area ── */
     #input-area {
       padding: 10px 12px;
       padding-bottom: max(10px, env(safe-area-inset-bottom));
@@ -172,7 +235,6 @@
       transition: transform 0.1s;
     }
     .action-btn:active { transform: scale(0.9); }
-
     #voice-btn { background: #1e3a5f; }
     #voice-btn.listening { background: #dc2626; animation: pulse 1s infinite; }
     #send-btn { background: #38bdf8; color: #000; }
@@ -190,7 +252,7 @@
   <div class="header-right">
     <div id="backend-toggle">
       <button class="backend-btn active-ollama" id="btn-ollama" onclick="switchBackend('ollama')">📱 Local</button>
-      <button class="backend-btn {% if not groq_available %}{% endif %}" id="btn-groq"
+      <button class="backend-btn" id="btn-groq"
               onclick="switchBackend('groq')" {% if not groq_available %}disabled title="Définir GROQ_API_KEY"{% endif %}>
         ☁️ Groq
       </button>
@@ -199,22 +261,37 @@
   </div>
 </header>
 
-<div id="messages">
-  {% if history %}
-    {% for msg in history %}
-      {% if msg.role == "user" %}
-        <div class="bubble user">{{ msg.content }}</div>
-      {% else %}
-        <div class="bubble jarvis">
-          <div class="label label-ollama">JARVIS</div>{{ msg.content }}
-        </div>
-      {% endif %}
-    {% endfor %}
-  {% else %}
-    <div class="bubble jarvis">
-      <div class="label label-ollama">JARVIS — LOCAL</div>Bonjour ! Comment puis-je vous aider ?
-    </div>
-  {% endif %}
+<div id="tab-bar">
+  <div class="tab active" id="tab-chat" onclick="showTab('chat')">💬 Chat</div>
+  <div class="tab" id="tab-history" onclick="showTab('history')">📋 Historique</div>
+</div>
+
+<!-- Vue Chat -->
+<div id="view-chat">
+  <div id="messages">
+    {% if history %}
+      {% for msg in history %}
+        {% if msg.role == "user" %}
+          <div class="bubble user">{{ msg.content }}</div>
+        {% else %}
+          <div class="bubble jarvis">
+            <div class="label label-ollama">JARVIS</div>{{ msg.content }}
+          </div>
+        {% endif %}
+      {% endfor %}
+    {% else %}
+      <div class="bubble jarvis">
+        <div class="label label-ollama">JARVIS — LOCAL</div>Bonjour ! Comment puis-je vous aider ?
+      </div>
+    {% endif %}
+  </div>
+</div>
+
+<!-- Vue Historique -->
+<div id="view-history">
+  <div id="history-list">
+    <div id="history-empty">Chargement…</div>
+  </div>
 </div>
 
 <div id="input-area">
@@ -234,28 +311,76 @@
   let currentBackend = 'ollama';
 
   // Scroll au dernier message au chargement
-  msgBox.scrollTop = msgBox.scrollHeight;
+  document.getElementById('view-chat').scrollTop = 99999;
+
+  // ── Onglets ───────────────────────────────────────────────────────────────
+  function showTab(tab) {
+    document.getElementById('view-chat').style.display    = tab === 'chat'    ? 'block' : 'none';
+    document.getElementById('view-history').style.display = tab === 'history' ? 'block' : 'none';
+    document.getElementById('input-area').style.display   = tab === 'chat'    ? 'flex'  : 'none';
+    document.getElementById('tab-chat').className    = 'tab' + (tab === 'chat'    ? ' active' : '');
+    document.getElementById('tab-history').className = 'tab' + (tab === 'history' ? ' active' : '');
+    if (tab === 'history') loadHistory();
+  }
+
+  // ── Historique ────────────────────────────────────────────────────────────
+  async function loadHistory() {
+    const list = document.getElementById('history-list');
+    const res  = await fetch('/history');
+    const msgs = await res.json();
+
+    if (!msgs.length) {
+      list.innerHTML = '<div id="history-empty">Aucune conversation enregistrée.</div>';
+      return;
+    }
+
+    list.innerHTML = '';
+    list.style.display = 'flex';
+    list.style.flexDirection = 'column';
+
+    let lastDate = '';
+    msgs.forEach(m => {
+      const ts   = m.ts ? new Date(m.ts) : null;
+      const date = ts ? ts.toLocaleDateString('fr-FR', { weekday:'long', day:'numeric', month:'long' }) : '';
+      const time = ts ? ts.toLocaleTimeString('fr-FR', { hour:'2-digit', minute:'2-digit' }) : '';
+
+      if (date && date !== lastDate) {
+        const d = document.createElement('div');
+        d.className = 'hist-date';
+        d.textContent = date;
+        list.appendChild(d);
+        lastDate = date;
+      }
+
+      const isUser = m.role === 'user';
+      const el = document.createElement('div');
+      el.className = `hist-msg ${isUser ? 'user' : 'jarvis'}`;
+      el.textContent = m.content;
+      list.appendChild(el);
+
+      if (time) {
+        const t = document.createElement('div');
+        t.className = 'hist-time' + (isUser ? ' right' : '');
+        t.textContent = time;
+        list.appendChild(t);
+      }
+    });
+
+    list.scrollTop = list.scrollHeight;
+  }
 
   // ── Backend toggle ────────────────────────────────────────────────────────
   async function switchBackend(b) {
     if (b === currentBackend) return;
-    const res  = await fetch('/backend', {
+    const res = await fetch('/backend', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ backend: b }),
     });
     if (!res.ok) { alert('Groq non disponible : GROQ_API_KEY non définie.'); return; }
     currentBackend = b;
-
-    document.getElementById('btn-ollama').className =
-      'backend-btn' + (b === 'ollama' ? ' active-ollama' : '');
-    document.getElementById('btn-groq').className =
-      'backend-btn' + (b === 'groq' ? ' active-groq' : '');
-
-    msgBox.innerHTML = '';
-    const label = b === 'groq' ? 'JARVIS — GROQ ☁️' : 'JARVIS — LOCAL 📱';
-    const cls   = b === 'groq' ? 'label-groq' : 'label-ollama';
-    addBubble(`Basculé en mode ${b === 'groq' ? 'Groq (intelligent)' : 'Local (phi3:mini)'}.`, b);
+    document.getElementById('btn-ollama').className = 'backend-btn' + (b === 'ollama' ? ' active-ollama' : '');
+    document.getElementById('btn-groq').className   = 'backend-btn' + (b === 'groq'   ? ' active-groq'   : '');
   }
 
   // ── Auto-resize textarea ──────────────────────────────────────────────────
@@ -276,12 +401,9 @@
     const d = document.createElement('div');
     const isGroq = backend === 'groq';
     d.className = 'bubble jarvis' + (isGroq ? ' from-groq' : '');
-    const labelCls  = isGroq ? 'label-groq' : 'label-ollama';
-    const labelText = isGroq ? 'JARVIS — GROQ ☁️' : 'JARVIS — LOCAL 📱';
-    d.innerHTML = `<div class="label ${labelCls}">${labelText}</div>${escape(text)}`;
+    d.innerHTML = `<div class="label ${isGroq ? 'label-groq' : 'label-ollama'}">${isGroq ? 'JARVIS — GROQ ☁️' : 'JARVIS — LOCAL 📱'}</div>${escape(text)}`;
     msgBox.appendChild(d);
     msgBox.scrollTop = msgBox.scrollHeight;
-    return d;
   }
 
   function addUserBubble(text) {
@@ -294,8 +416,7 @@
 
   function showTyping() {
     const d = document.createElement('div');
-    d.className = 'bubble jarvis typing';
-    d.id = 'typing';
+    d.className = 'bubble jarvis typing'; d.id = 'typing';
     d.innerHTML = '<span></span><span></span><span></span>';
     msgBox.appendChild(d);
     msgBox.scrollTop = msgBox.scrollHeight;
@@ -305,13 +426,10 @@
   async function send() {
     const text = input.value.trim();
     if (!text || busy) return;
-    input.value = '';
-    input.style.height = 'auto';
+    input.value = ''; input.style.height = 'auto';
     busy = true;
-
     addUserBubble(text);
     showTyping();
-
     try {
       const res  = await fetch('/chat', {
         method: 'POST',
@@ -351,25 +469,23 @@
     };
     rec.onerror = rec.onend = () => voiceBtn.classList.remove('listening');
     voiceBtn.addEventListener('click', () => {
-      if (voiceBtn.classList.contains('listening')) { rec.stop(); }
-      else { voiceBtn.classList.add('listening'); rec.start(); }
+      voiceBtn.classList.contains('listening') ? rec.stop()
+        : (voiceBtn.classList.add('listening'), rec.start());
     });
   } else {
     voiceBtn.style.opacity = '0.3';
-    voiceBtn.title = 'Voix non disponible';
   }
 
   // ── Réinitialisation ──────────────────────────────────────────────────────
   resetBtn.addEventListener('click', async () => {
+    if (!confirm('Effacer toute la conversation ?')) return;
     await fetch('/reset', { method: 'POST' });
     msgBox.innerHTML = '';
     addBubble('Conversation effacée.', currentBackend);
   });
 
   // ── PWA ───────────────────────────────────────────────────────────────────
-  if ('serviceWorker' in navigator) {
-    navigator.serviceWorker.register('/sw.js');
-  }
+  if ('serviceWorker' in navigator) navigator.serviceWorker.register('/sw.js');
 </script>
 </body>
 </html>
