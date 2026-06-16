@@ -1,0 +1,17 @@
+{
+  "name": "Jarvis",
+  "short_name": "Jarvis",
+  "description": "Assistant personnel IA",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#0d0d1a",
+  "theme_color": "#38bdf8",
+  "icons": [
+    {
+      "src": "/static/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}

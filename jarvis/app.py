@@ -2,7 +2,7 @@
 """Jarvis — interface web (Flask + Groq, gratuit)."""
 
 import os
-from flask import Flask, jsonify, render_template, request
+from flask import Flask, jsonify, render_template, request, send_from_directory
 from groq import Groq
 
 app = Flask(__name__)
@@ -44,6 +44,13 @@ def chat():
 def reset():
     _history.clear()
     return jsonify({"ok": True})
+
+
+@app.route("/sw.js")
+def service_worker():
+    resp = send_from_directory("static", "sw.js")
+    resp.headers["Service-Worker-Allowed"] = "/"
+    return resp
 
 
 if __name__ == "__main__":

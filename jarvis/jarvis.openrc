@@ -1,0 +1,14 @@
+#!/sbin/openrc-run
+
+name="jarvis"
+description="Jarvis AI Assistant"
+command="/usr/bin/python3"
+command_args="/opt/jarvis/app.py"
+command_background=true
+pidfile="/run/${RC_SVCNAME}.pid"
+output_log="/var/log/${RC_SVCNAME}.log"
+error_log="/var/log/${RC_SVCNAME}.log"
+
+depend() {
+    need net
+}
