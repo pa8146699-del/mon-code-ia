@@ -26,30 +26,58 @@
 
     header {
       background: #111827;
-      padding: 14px 16px;
+      padding: 10px 14px;
       display: flex;
       align-items: center;
       justify-content: space-between;
       border-bottom: 1px solid #1e3a5f;
       flex-shrink: 0;
+      gap: 8px;
     }
 
-    header h1 { font-size: 1.15rem; color: #38bdf8; letter-spacing: 0.05em; }
+    header h1 { font-size: 1.1rem; color: #38bdf8; letter-spacing: 0.05em; flex-shrink: 0; }
+
+    .header-right { display: flex; gap: 6px; align-items: center; }
+
+    /* Toggle local / groq */
+    #backend-toggle {
+      display: flex;
+      border-radius: 20px;
+      overflow: hidden;
+      border: 1px solid #1e3a5f;
+    }
+
+    .backend-btn {
+      padding: 5px 10px;
+      font-size: 0.72rem;
+      font-weight: 600;
+      border: none;
+      cursor: pointer;
+      background: transparent;
+      color: #6b7280;
+      transition: background 0.2s, color 0.2s;
+      white-space: nowrap;
+    }
+
+    .backend-btn.active-ollama { background: #1e3a5f; color: #38bdf8; }
+    .backend-btn.active-groq   { background: #4c1d95; color: #a78bfa; }
+    .backend-btn:disabled      { opacity: 0.35; cursor: not-allowed; }
 
     #reset-btn {
       background: transparent;
       border: 1px solid #374151;
       color: #9ca3af;
-      padding: 5px 12px;
+      padding: 5px 10px;
       border-radius: 14px;
-      font-size: 0.75rem;
+      font-size: 0.72rem;
       cursor: pointer;
+      white-space: nowrap;
     }
 
     #messages {
       flex: 1;
       overflow-y: auto;
-      padding: 16px 12px;
+      padding: 14px 12px;
       display: flex;
       flex-direction: column;
       gap: 10px;
@@ -81,24 +109,24 @@
       border: 1px solid #1e3a5f;
     }
 
+    .bubble.jarvis.from-groq { border-color: #4c1d95; }
+
     .bubble.jarvis .label {
       font-size: 0.68rem;
-      color: #38bdf8;
       font-weight: 700;
       letter-spacing: 0.08em;
       margin-bottom: 5px;
     }
 
+    .label-ollama { color: #38bdf8; }
+    .label-groq   { color: #a78bfa; }
+
     .typing {
-      display: flex;
-      gap: 5px;
-      align-items: center;
+      display: flex; gap: 5px; align-items: center;
       padding: 14px 16px;
     }
-
     .typing span {
-      width: 7px; height: 7px;
-      border-radius: 50%;
+      width: 7px; height: 7px; border-radius: 50%;
       background: #38bdf8;
       animation: bounce 1.2s infinite;
     }
@@ -134,28 +162,20 @@
       outline: none;
       line-height: 1.4;
     }
-
     #message-input::placeholder { color: #4b5563; }
 
     .action-btn {
       width: 44px; height: 44px;
-      border-radius: 50%;
-      border: none;
-      cursor: pointer;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      font-size: 1.1rem;
-      flex-shrink: 0;
-      transition: transform 0.1s, background 0.2s;
+      border-radius: 50%; border: none; cursor: pointer;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 1.1rem; flex-shrink: 0;
+      transition: transform 0.1s;
     }
-
     .action-btn:active { transform: scale(0.9); }
 
     #voice-btn { background: #1e3a5f; }
     #voice-btn.listening { background: #dc2626; animation: pulse 1s infinite; }
-
-    #send-btn { background: #38bdf8; color: #000; font-size: 1rem; }
+    #send-btn { background: #38bdf8; color: #000; }
 
     @keyframes pulse {
       0%, 100% { box-shadow: 0 0 0 0 rgba(220,38,38,0.4); }
@@ -167,12 +187,21 @@
 
 <header>
   <h1>⚡ JARVIS</h1>
-  <button id="reset-btn">Nouvelle conv.</button>
+  <div class="header-right">
+    <div id="backend-toggle">
+      <button class="backend-btn active-ollama" id="btn-ollama" onclick="switchBackend('ollama')">📱 Local</button>
+      <button class="backend-btn {% if not groq_available %}{% endif %}" id="btn-groq"
+              onclick="switchBackend('groq')" {% if not groq_available %}disabled title="Définir GROQ_API_KEY"{% endif %}>
+        ☁️ Groq
+      </button>
+    </div>
+    <button id="reset-btn">Effacer</button>
+  </div>
 </header>
 
 <div id="messages">
   <div class="bubble jarvis">
-    <div class="label">JARVIS</div>Bonjour ! Comment puis-je vous aider ?
+    <div class="label label-ollama">JARVIS — LOCAL</div>Bonjour ! Comment puis-je vous aider ?
   </div>
 </div>
 
@@ -183,39 +212,69 @@
 </div>
 
 <script>
-  const msgBox  = document.getElementById('messages');
-  const input   = document.getElementById('message-input');
-  const sendBtn = document.getElementById('send-btn');
-  const voiceBtn= document.getElementById('voice-btn');
-  const resetBtn= document.getElementById('reset-btn');
+  const msgBox   = document.getElementById('messages');
+  const input    = document.getElementById('message-input');
+  const sendBtn  = document.getElementById('send-btn');
+  const voiceBtn = document.getElementById('voice-btn');
+  const resetBtn = document.getElementById('reset-btn');
 
   let busy = false;
+  let currentBackend = 'ollama';
 
-  // Auto-resize textarea
+  // ── Backend toggle ────────────────────────────────────────────────────────
+  async function switchBackend(b) {
+    if (b === currentBackend) return;
+    const res  = await fetch('/backend', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ backend: b }),
+    });
+    if (!res.ok) { alert('Groq non disponible : GROQ_API_KEY non définie.'); return; }
+    currentBackend = b;
+
+    document.getElementById('btn-ollama').className =
+      'backend-btn' + (b === 'ollama' ? ' active-ollama' : '');
+    document.getElementById('btn-groq').className =
+      'backend-btn' + (b === 'groq' ? ' active-groq' : '');
+
+    msgBox.innerHTML = '';
+    const label = b === 'groq' ? 'JARVIS — GROQ ☁️' : 'JARVIS — LOCAL 📱';
+    const cls   = b === 'groq' ? 'label-groq' : 'label-ollama';
+    addBubble(`Basculé en mode ${b === 'groq' ? 'Groq (intelligent)' : 'Local (phi3:mini)'}.`, b);
+  }
+
+  // ── Auto-resize textarea ──────────────────────────────────────────────────
   input.addEventListener('input', () => {
     input.style.height = 'auto';
     input.style.height = Math.min(input.scrollHeight, 110) + 'px';
   });
-
   input.addEventListener('keydown', e => {
     if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send(); }
   });
-
   sendBtn.addEventListener('click', send);
 
   function escape(t) {
     return t.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
   }
 
-  function addBubble(text, role) {
+  function addBubble(text, backend) {
     const d = document.createElement('div');
-    d.className = `bubble ${role}`;
-    d.innerHTML = role === 'jarvis'
-      ? `<div class="label">JARVIS</div>${escape(text)}`
-      : escape(text);
+    const isGroq = backend === 'groq';
+    d.className = 'bubble jarvis' + (isGroq ? ' from-groq' : '');
+    const labelCls  = isGroq ? 'label-groq' : 'label-ollama';
+    const labelText = isGroq ? 'JARVIS — GROQ ☁️' : 'JARVIS — LOCAL 📱';
+    d.innerHTML = `<div class="label ${labelCls}">${labelText}</div>${escape(text)}`;
     msgBox.appendChild(d);
     msgBox.scrollTop = msgBox.scrollHeight;
     return d;
+  }
+
+  function addUserBubble(text) {
+    const d = document.createElement('div');
+    d.className = 'bubble user';
+    d.textContent = text;
+    msgBox.appendChild(d);
+    msgBox.scrollTop = msgBox.scrollHeight;
   }
 
   function showTyping() {
@@ -226,18 +285,16 @@
     msgBox.appendChild(d);
     msgBox.scrollTop = msgBox.scrollHeight;
   }
-
   function hideTyping() { document.getElementById('typing')?.remove(); }
 
   async function send() {
     const text = input.value.trim();
     if (!text || busy) return;
-
     input.value = '';
     input.style.height = 'auto';
     busy = true;
 
-    addBubble(text, 'user');
+    addUserBubble(text);
     showTyping();
 
     try {
@@ -248,17 +305,16 @@
       });
       const data = await res.json();
       hideTyping();
-      addBubble(data.reply ?? data.error, 'jarvis');
+      addBubble(data.reply ?? data.error, data.backend ?? currentBackend);
       speak(data.reply ?? '');
     } catch {
       hideTyping();
-      addBubble('Impossible de joindre Jarvis. Le serveur est-il démarré ?', 'jarvis');
+      addBubble('Impossible de joindre Jarvis. Le serveur est-il démarré ?', currentBackend);
     }
-
     busy = false;
   }
 
-  // ── Synthèse vocale (navigateur) ──────────────────────────────────────────
+  // ── Synthèse vocale ───────────────────────────────────────────────────────
   function speak(text) {
     if (!text || !window.speechSynthesis) return;
     speechSynthesis.cancel();
@@ -267,41 +323,35 @@
     speechSynthesis.speak(utt);
   }
 
-  // ── Reconnaissance vocale (navigateur) ───────────────────────────────────
+  // ── Reconnaissance vocale ─────────────────────────────────────────────────
   const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
   if (SR) {
     const rec = new SR();
     rec.lang = 'fr-FR';
     rec.interimResults = false;
-
     rec.onresult = e => {
       input.value = e.results[0][0].transcript;
       voiceBtn.classList.remove('listening');
       send();
     };
     rec.onerror = rec.onend = () => voiceBtn.classList.remove('listening');
-
     voiceBtn.addEventListener('click', () => {
-      if (voiceBtn.classList.contains('listening')) {
-        rec.stop();
-      } else {
-        voiceBtn.classList.add('listening');
-        rec.start();
-      }
+      if (voiceBtn.classList.contains('listening')) { rec.stop(); }
+      else { voiceBtn.classList.add('listening'); rec.start(); }
     });
   } else {
     voiceBtn.style.opacity = '0.3';
-    voiceBtn.title = 'Voix non disponible sur ce navigateur';
+    voiceBtn.title = 'Voix non disponible';
   }
 
   // ── Réinitialisation ──────────────────────────────────────────────────────
   resetBtn.addEventListener('click', async () => {
     await fetch('/reset', { method: 'POST' });
     msgBox.innerHTML = '';
-    addBubble('Conversation réinitialisée. Comment puis-je vous aider ?', 'jarvis');
+    addBubble('Conversation effacée.', currentBackend);
   });
 
-  // ── PWA : enregistrement du service worker ────────────────────────────────
+  // ── PWA ───────────────────────────────────────────────────────────────────
   if ('serviceWorker' in navigator) {
     navigator.serviceWorker.register('/sw.js');
   }

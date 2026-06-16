@@ -1,22 +1,44 @@
 #!/usr/bin/env python3
-"""Jarvis — interface web (Flask + Ollama local, gratuit)."""
+"""Jarvis — interface web avec choix du backend : Ollama local ou Groq cloud."""
 
+import os
 from flask import Flask, jsonify, render_template, request, send_from_directory
 import ollama
 
 app = Flask(__name__)
 
-MODEL  = "phi3:mini"   # ~2.2 Go — meilleur modèle pour téléphone ≤ 4 Go RAM
+OLLAMA_MODEL = "phi3:mini"
+GROQ_MODEL   = "llama-3.3-70b-versatile"
+
 _SYSTEM = (
     "Tu es Jarvis, un assistant personnel intelligent, concis et utile. "
     "Réponds en français sauf si l'utilisateur écrit dans une autre langue."
 )
 _history: list[dict] = []
+_backend = "ollama"  # "ollama" | "groq"
+
+# Client Groq optionnel (actif uniquement si GROQ_API_KEY est défini)
+_groq = None
+if os.environ.get("GROQ_API_KEY"):
+    from groq import Groq
+    _groq = Groq(api_key=os.environ["GROQ_API_KEY"])
 
 
 @app.route("/")
 def index():
-    return render_template("index.html")
+    return render_template("index.html", groq_available=_groq is not None)
+
+
+@app.route("/backend", methods=["POST"])
+def set_backend():
+    global _backend
+    data = request.get_json() or {}
+    requested = data.get("backend", "ollama")
+    if requested == "groq" and _groq is None:
+        return jsonify({"error": "GROQ_API_KEY non définie"}), 400
+    _backend = requested
+    _history.clear()
+    return jsonify({"backend": _backend})
 
 
 @app.route("/chat", methods=["POST"])
@@ -27,14 +49,22 @@ def chat():
 
     _history.append({"role": "user", "content": user_message})
 
-    response = ollama.chat(
-        model=MODEL,
-        messages=[{"role": "system", "content": _SYSTEM}] + _history,
-    )
+    if _backend == "groq" and _groq:
+        response = _groq.chat.completions.create(
+            model=GROQ_MODEL,
+            messages=[{"role": "system", "content": _SYSTEM}] + _history,
+            max_tokens=1024,
+        )
+        reply = response.choices[0].message.content
+    else:
+        response = ollama.chat(
+            model=OLLAMA_MODEL,
+            messages=[{"role": "system", "content": _SYSTEM}] + _history,
+        )
+        reply = response.message.content
 
-    reply = response.message.content
     _history.append({"role": "assistant", "content": reply})
-    return jsonify({"reply": reply})
+    return jsonify({"reply": reply, "backend": _backend})
 
 
 @app.route("/reset", methods=["POST"])
@@ -51,5 +81,8 @@ def service_worker():
 
 
 if __name__ == "__main__":
-    print("Jarvis démarré → http://localhost:5000\n")
+    mode = "Ollama local"
+    if _groq:
+        mode += " + Groq cloud disponible"
+    print(f"Jarvis démarré ({mode}) → http://localhost:5000\n")
     app.run(host="0.0.0.0", port=5000, debug=False)
