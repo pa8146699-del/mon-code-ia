@@ -235,7 +235,16 @@ def chat():
                         full += tok
                         yield _sse({"token": tok})
         except Exception as e:
-            yield _sse({"error": str(e)})
+            msg_err = str(e)
+            low = msg_err.lower()
+            if use == "ollama" and ("refused" in low or "111" in low or "connect" in low):
+                msg_err = ("Ollama (le moteur IA local) n'est pas démarré. "
+                           "Dans Alpine, lance : sh ~/mon-code-ia/start.sh")
+            elif use == "ollama" and ("not found" in low or "no such model" in low or "pull" in low):
+                m = _settings["ollama_vision_model"] if has_imgs else _settings["ollama_model"]
+                msg_err = (f"Le modèle local « {m} » n'est pas téléchargé. "
+                           f"Avec internet, lance : ollama pull {m}")
+            yield _sse({"error": msg_err})
             history.pop()
             return
 
