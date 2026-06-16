@@ -10,38 +10,35 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ```bash
 pip install -r jarvis/requirements.txt
-export ANTHROPIC_API_KEY=sk-...
+export ANTHROPIC_API_KEY=your-key-here
 ```
 
 ## Running Jarvis
 
 ```bash
-# Mode texte (terminal)
+# Text mode (terminal only)
 python jarvis/jarvis.py
 
-# Mode vocal (microphone + synthèse vocale)
+# Voice mode (microphone input + speech synthesis)
 python jarvis/jarvis.py --voice
 ```
 
 ## Architecture
 
-### `jarvis/jarvis.py`
+`jarvis/jarvis.py` is a single-file application (~100 lines). Key design points:
 
-- `read_input()` — reads a command from stdin (text mode)
-- `listen()` — captures audio from the microphone and converts to text via Google Speech Recognition (voice mode, `--voice` flag)
-- `respond(user_message)` — sends the message to Claude (`claude-sonnet-4-6`) with full conversation history and returns the reply
-- `speak(text)` — synthesizes text to speech via pyttsx3 (voice mode only)
-- `main()` — event loop that selects input method based on `--voice` flag and exits on "quitter"/"stop"/"exit"/"quit"
+- **Voice dependency loading** is conditional at module level (not lazy): if `--voice` is in `sys.argv`, `pyttsx3` and `speech_recognition` are imported immediately on startup. This means a missing voice dependency crashes at import time, not at first use.
+- **Conversation state** (`_history: list[dict]`) is a module-level global. It accumulates the full turn-by-turn exchange and is passed to every Claude API call, giving multi-turn context. It is lost when the process exits.
+- **Model and limits**: hardcoded to `claude-sonnet-4-6` with `max_tokens=1024`.
+- **Language**: the system prompt instructs Claude to reply in French by default, switching to the user's language if they write in another one.
+- **Exit keywords**: `"quitter"`, `"stop"`, `"exit"`, `"quit"` (checked case-insensitively) terminate the loop.
+- `ANTHROPIC_API_KEY` is read directly from the environment via `os.environ["ANTHROPIC_API_KEY"]` — it will raise `KeyError` if unset.
 
-Conversation history (`_history`) is kept in memory for the duration of the session, giving Claude multi-turn context.
+## Dependencies
 
-### Dependencies
-
-| Package | Purpose |
+| Package | Required for |
 |---|---|
-| `anthropic` | Claude API client (required) |
-| `SpeechRecognition` | Microphone → text (voice mode) |
-| `pyttsx3` | Text → speech, works offline (voice mode) |
-| `PyAudio` | Audio I/O backend for SpeechRecognition (voice mode) |
-
-Voice dependencies are only imported when `--voice` is passed, so the text-only mode has no extra requirements beyond `anthropic`.
+| `anthropic>=0.40.0` | Claude API client — always required |
+| `SpeechRecognition>=3.10.0` | Microphone → text (`--voice` only) |
+| `pyttsx3>=2.90` | Text → speech, offline (`--voice` only) |
+| `PyAudio>=0.2.14` | Audio I/O backend for SpeechRecognition (`--voice` only) |
