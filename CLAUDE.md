@@ -41,27 +41,29 @@ python jarvis/jarvis.py --voice
 
 ## DataGuard
 
-`dataguard/dataguard.py` is a self-contained CLI that scans a file or directory for sensitive data (API keys, passwords, e-mails, credit card numbers, IPs…) to prevent leaks before sharing or committing.
+`dataguard/` is a self-contained security toolkit (Python 3 standard library only) exposed through subcommands on `dataguard.py`:
 
 ```bash
-python dataguard/dataguard.py <file-or-dir>          # human-readable report
-python dataguard/dataguard.py <file-or-dir> --json   # machine-readable output
-python dataguard/dataguard.py <file-or-dir> --strict # exit 1 on any finding (CI)
+python dataguard/dataguard.py scan <file-or-dir> [--json|--html FILE] [--strict]
+python dataguard/dataguard.py phishing [--text STR | --file PATH] [--json] [--strict]
+python dataguard/dataguard.py install-hook [--force]
+python dataguard/dataguard.py scan-staged [--strict]   # used by the git hook
 ```
 
-Design points:
+Module layout (all flat, imported by simple name since `dataguard/` is on `sys.path[0]` when run directly):
 
-- **No external dependencies** — Python 3 standard library only.
-- Detection is **regex-driven** via the `DETECTORS` list; add a new `Detector(name, compiled_regex, severity)` entry to extend coverage.
-- Credit-card matches are confirmed with the **Luhn checksum** (`luhn_valid`) to cut false positives.
-- Reported values are **redacted** (`redact`) so secrets are never re-printed in full.
-- `.git`, `node_modules`, `__pycache__`, `venv`/`.venv` and common binary extensions are skipped during directory scans.
+- `dataguard.py` — argparse subcommand dispatch (`cmd_*` functions). Each subcommand maps to `func` via `set_defaults`.
+- `detectors.py` — the `DETECTORS` list and scanning logic (`scan`, `scan_file`, `scan_line`, `sort_findings`). Extend coverage by adding a `Detector(name, compiled_regex, severity)` entry. Credit-card hits are confirmed with the **Luhn checksum** (`luhn_valid`); all reported values are **redacted** (`redact`).
+- `phishing.py` — heuristic phishing scorer. `analyze(text)` returns `(score 0-100, [PhishingSignal])`; lookalike-domain detection normalizes digit-for-letter swaps (`paypa1` → `paypal`) and skips legitimate `brand.tld` hosts.
+- `report.py` — standalone HTML report (`build_html`); never embeds raw secrets.
 
-Tests live in `dataguard/test_dataguard.py`:
+`scan-staged` + `install-hook` implement a git `pre-commit` guard: the hook calls `scan-staged --strict` to block commits whose staged files contain secrets. The hook is written to `$(git rev-parse --git-dir)/hooks/pre-commit`. **Do not run `install-hook` from inside this repo's working tree** — it would install a pre-commit hook into `mon-code-ia/.git` and block your own commits; test it in a throwaway repo instead.
+
+Tests live in `dataguard/test_dataguard.py` and import the modules by name, so run them from inside `dataguard/`:
 
 ```bash
 python -m pytest dataguard/        # if pytest is installed
-python dataguard/test_dataguard.py # zero-dependency fallback runner
+cd dataguard && python test_dataguard.py   # zero-dependency fallback runner
 ```
 
 ## Dependencies

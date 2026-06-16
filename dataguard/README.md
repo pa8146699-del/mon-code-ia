@@ -1,47 +1,75 @@
 # DataGuard
 
-Scanner anti-fuite de données en ligne de commande. DataGuard analyse un
-fichier ou un dossier et détecte les données sensibles (clés API, mots de
-passe, e-mails, numéros de carte bancaire, etc.) **avant** qu'elles ne
-fuient lors d'un partage ou d'un commit.
+Boîte à outils de sécurité en ligne de commande, sans aucune dépendance
+externe (bibliothèque standard de Python 3 uniquement). DataGuard regroupe
+trois fonctions :
 
-Aucune dépendance externe : uniquement la bibliothèque standard de Python 3.
+1. **scan** — détecte les données sensibles (clés API, mots de passe,
+   e-mails, cartes bancaires, IBAN…) avant qu'elles ne fuient.
+2. **phishing** — évalue le risque d'hameçonnage d'un texte ou d'un e-mail.
+3. **install-hook** — installe un hook git qui bloque les commits contenant
+   des secrets.
 
-## Utilisation
+## Sous-commande `scan`
 
 ```bash
-# Scanner un fichier
-python dataguard/dataguard.py mon_fichier.txt
-
-# Scanner un dossier entier (récursif)
-python dataguard/dataguard.py mon_projet/
-
-# Résultat au format JSON
-python dataguard/dataguard.py mon_projet/ --json
-
-# Mode strict : code de sortie 1 si une fuite est trouvée (utile en CI)
-python dataguard/dataguard.py mon_projet/ --strict
+python dataguard/dataguard.py scan mon_fichier.txt          # rapport terminal
+python dataguard/dataguard.py scan mon_projet/              # dossier (récursif)
+python dataguard/dataguard.py scan mon_projet/ --json       # sortie JSON
+python dataguard/dataguard.py scan mon_projet/ --html rapport.html  # rapport HTML
+python dataguard/dataguard.py scan mon_projet/ --strict     # code 1 si fuite (CI)
 ```
 
-## Ce que DataGuard détecte
+### Ce que `scan` détecte
 
 | Type | Gravité |
 |---|---|
 | Clé privée (RSA, EC, OpenSSH…) | élevée |
-| Clé API AWS, Anthropic, OpenAI | élevée |
-| Jeton GitHub | élevée |
+| Clés API AWS, Anthropic, OpenAI, Google, Stripe, SendGrid | élevée |
+| Jetons GitHub, Slack, OAuth Google | élevée |
 | Mot de passe en clair | élevée |
+| IBAN | élevée |
 | Numéro de carte bancaire (validé par Luhn) | élevée |
-| Jeton JWT | moyenne |
-| Secret / token générique | moyenne |
-| Adresse e-mail | faible |
-| Adresse IPv4 | faible |
+| Jeton JWT, webhook Slack, secret/token générique | moyenne |
+| Adresse e-mail, numéro de téléphone (FR), adresse IPv4 | faible |
+
+Les valeurs détectées sont **masquées** dans tous les rapports (ex.
+`AKIA***EF`) : le secret n'est jamais réaffiché en entier.
+
+## Sous-commande `phishing`
+
+Analyse un texte et calcule un score de risque (0-100) à partir d'indices :
+langage d'urgence, demande d'identifiants, liens suspects, domaines sosies
+(`paypa1.com`), liens vers une IP, raccourcisseurs d'URL, pièces jointes
+dangereuses…
+
+```bash
+python dataguard/dataguard.py phishing --text "URGENT confirmez vos identifiants..."
+python dataguard/dataguard.py phishing --file mail.txt
+cat mail.txt | python dataguard/dataguard.py phishing        # depuis stdin
+python dataguard/dataguard.py phishing --file mail.txt --json --strict
+```
+
+## Sous-commande `install-hook`
+
+Installe un hook `pre-commit` dans le dépôt git courant. Tout commit
+contenant un secret dans les fichiers indexés sera refusé.
+
+```bash
+python dataguard/dataguard.py install-hook            # installe le hook
+python dataguard/dataguard.py install-hook --force    # écrase un hook existant
+```
+
+## Tests
+
+```bash
+python -m pytest dataguard/        # si pytest est installé
+python dataguard/test_dataguard.py # exécution sans dépendance
+```
 
 ## Notes
 
-- Les valeurs détectées sont **masquées** dans le rapport pour ne pas
-  réafficher le secret en entier.
-- Les numéros de carte sont validés par l'algorithme de Luhn afin de
-  réduire les faux positifs.
+- Les numéros de carte sont validés par l'algorithme de Luhn pour réduire
+  les faux positifs.
 - Les dossiers `.git`, `node_modules`, `__pycache__`, `venv`/`.venv` et les
-  fichiers binaires courants sont ignorés.
+  fichiers binaires courants sont ignorés lors d'un scan de dossier.

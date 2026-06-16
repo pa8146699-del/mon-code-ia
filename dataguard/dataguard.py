@@ -1,244 +1,59 @@
 #!/usr/bin/env python3
-"""DataGuard — scanner anti-fuite de données.
+"""DataGuard — boîte à outils anti-fuite de données et anti-phishing.
 
-Analyse un fichier ou un dossier et détecte les données sensibles
-(clés API, mots de passe, e-mails, numéros de carte bancaire, etc.)
-afin d'éviter qu'elles ne fuient avant un partage ou un commit.
+Sous-commandes :
+  scan          Analyse un fichier/dossier à la recherche de données sensibles.
+  phishing      Évalue le risque d'hameçonnage d'un texte ou d'un e-mail.
+  install-hook  Installe un hook git pre-commit qui bloque les fuites.
+
+Aucune dépendance externe : bibliothèque standard de Python 3 uniquement.
 """
 
 import argparse
 import json
-import re
+import stat
+import subprocess
 import sys
-from dataclasses import dataclass, asdict
+from dataclasses import asdict
 from pathlib import Path
 
-# --- Définition des motifs sensibles ---------------------------------------
-#
-# Chaque détecteur a un nom, une expression régulière compilée et un niveau
-# de gravité. La sévérité aide à trier les fuites les plus graves.
-
-SEVERITY_HIGH = "élevée"
-SEVERITY_MEDIUM = "moyenne"
-SEVERITY_LOW = "faible"
+import detectors
+import phishing
+from report import build_html
 
 
-@dataclass
-class Detector:
-    name: str
-    regex: re.Pattern
-    severity: str
+# --- Sous-commande : scan --------------------------------------------------
 
-
-DETECTORS: list[Detector] = [
-    Detector(
-        "Clé privée",
-        re.compile(r"-----BEGIN (?:RSA |EC |OPENSSH |DSA |PGP )?PRIVATE KEY-----"),
-        SEVERITY_HIGH,
-    ),
-    Detector(
-        "Clé API AWS",
-        re.compile(r"\b(?:AKIA|ASIA)[0-9A-Z]{16}\b"),
-        SEVERITY_HIGH,
-    ),
-    Detector(
-        "Clé API Anthropic",
-        re.compile(r"\bsk-ant-[A-Za-z0-9_\-]{20,}\b"),
-        SEVERITY_HIGH,
-    ),
-    Detector(
-        "Clé API OpenAI",
-        re.compile(r"\bsk-[A-Za-z0-9]{20,}\b"),
-        SEVERITY_HIGH,
-    ),
-    Detector(
-        "Jeton GitHub",
-        re.compile(r"\bgh[pousr]_[A-Za-z0-9]{36,}\b"),
-        SEVERITY_HIGH,
-    ),
-    Detector(
-        "Jeton JWT",
-        re.compile(r"\beyJ[A-Za-z0-9_\-]+\.[A-Za-z0-9_\-]+\.[A-Za-z0-9_\-]+\b"),
-        SEVERITY_MEDIUM,
-    ),
-    Detector(
-        "Mot de passe en clair",
-        re.compile(
-            r"(?i)(?:password|passwd|mot_de_passe|motdepasse|pwd)\s*[:=]\s*"
-            r"['\"]?[^\s'\"]{4,}"
-        ),
-        SEVERITY_HIGH,
-    ),
-    Detector(
-        "Secret / token générique",
-        re.compile(
-            r"(?i)(?:secret|api[_\-]?key|token|access[_\-]?key)\s*[:=]\s*"
-            r"['\"]?[A-Za-z0-9_\-]{12,}"
-        ),
-        SEVERITY_MEDIUM,
-    ),
-    Detector(
-        "Adresse e-mail",
-        re.compile(r"\b[A-Za-z0-9._%+\-]+@[A-Za-z0-9.\-]+\.[A-Za-z]{2,}\b"),
-        SEVERITY_LOW,
-    ),
-    Detector(
-        "Carte bancaire",
-        re.compile(r"\b(?:\d[ \-]?){13,16}\b"),
-        SEVERITY_HIGH,
-    ),
-    Detector(
-        "Adresse IPv4",
-        re.compile(r"\b(?:\d{1,3}\.){3}\d{1,3}\b"),
-        SEVERITY_LOW,
-    ),
-]
-
-# Extensions binaires à ignorer lors d'un scan de dossier.
-BINARY_EXTENSIONS = {
-    ".png", ".jpg", ".jpeg", ".gif", ".bmp", ".ico", ".pdf", ".zip",
-    ".gz", ".tar", ".exe", ".dll", ".so", ".dylib", ".pyc", ".bin",
-    ".mp3", ".mp4", ".mov", ".avi", ".wav", ".woff", ".woff2", ".ttf",
-}
-
-# Dossiers à ne jamais explorer.
-SKIP_DIRS = {".git", "__pycache__", "node_modules", ".venv", "venv", ".mypy_cache"}
-
-
-@dataclass
-class Finding:
-    """Une fuite potentielle détectée."""
-
-    file: str
-    line: int
-    type: str
-    severity: str
-    excerpt: str
-
-
-def luhn_valid(number: str) -> bool:
-    """Valide un numéro de carte via l'algorithme de Luhn."""
-    digits = [int(d) for d in re.sub(r"[ \-]", "", number)]
-    if not 13 <= len(digits) <= 16:
-        return False
-    checksum = 0
-    parity = len(digits) % 2
-    for i, d in enumerate(digits):
-        if i % 2 == parity:
-            d *= 2
-            if d > 9:
-                d -= 9
-        checksum += d
-    return checksum % 10 == 0
-
-
-def redact(text: str) -> str:
-    """Masque le milieu d'une chaîne sensible pour ne pas la réafficher."""
-    text = text.strip()
-    if len(text) <= 8:
-        return text[0] + "***" if text else "***"
-    return f"{text[:4]}***{text[-2:]}"
-
-
-def scan_line(line: str, line_no: int, file: str) -> list[Finding]:
-    """Applique tous les détecteurs à une ligne."""
-    findings: list[Finding] = []
-    for detector in DETECTORS:
-        for match in detector.regex.finditer(line):
-            value = match.group(0)
-            # Réduit les faux positifs sur les cartes bancaires.
-            if detector.name == "Carte bancaire" and not luhn_valid(value):
-                continue
-            findings.append(
-                Finding(
-                    file=file,
-                    line=line_no,
-                    type=detector.name,
-                    severity=detector.severity,
-                    excerpt=redact(value),
-                )
-            )
-    return findings
-
-
-def scan_file(path: Path) -> list[Finding]:
-    """Scanne un fichier texte ligne par ligne."""
-    findings: list[Finding] = []
-    try:
-        with path.open("r", encoding="utf-8", errors="ignore") as f:
-            for line_no, line in enumerate(f, start=1):
-                findings.extend(scan_line(line, line_no, str(path)))
-    except OSError as e:
-        print(f"Impossible de lire {path} : {e}", file=sys.stderr)
-    return findings
-
-
-def iter_files(root: Path):
-    """Parcourt récursivement les fichiers texte d'un dossier."""
-    for path in root.rglob("*"):
-        if not path.is_file():
-            continue
-        if any(part in SKIP_DIRS for part in path.parts):
-            continue
-        if path.suffix.lower() in BINARY_EXTENSIONS:
-            continue
-        yield path
-
-
-def scan(target: Path) -> list[Finding]:
-    """Scanne un fichier ou un dossier."""
-    if target.is_file():
-        return scan_file(target)
-    if target.is_dir():
-        findings: list[Finding] = []
-        for path in iter_files(target):
-            findings.extend(scan_file(path))
-        return findings
-    raise FileNotFoundError(f"Cible introuvable : {target}")
-
-
-def print_report(findings: list[Finding]) -> None:
+def print_report(findings: list[detectors.Finding]) -> None:
     """Affiche un rapport lisible dans le terminal."""
     if not findings:
         print("✓ Aucune donnée sensible détectée.")
         return
 
-    order = {SEVERITY_HIGH: 0, SEVERITY_MEDIUM: 1, SEVERITY_LOW: 2}
-    findings = sorted(findings, key=lambda f: (order[f.severity], f.file, f.line))
-
+    findings = detectors.sort_findings(findings)
     print(f"⚠ {len(findings)} fuite(s) potentielle(s) détectée(s) :\n")
     for f in findings:
         print(f"  [{f.severity:<7}] {f.type}")
         print(f"            {f.file}:{f.line}  →  {f.excerpt}\n")
 
-    high = sum(1 for f in findings if f.severity == SEVERITY_HIGH)
+    high = sum(1 for f in findings if f.severity == detectors.SEVERITY_HIGH)
     if high:
         print(f"→ Dont {high} de gravité élevée à corriger en priorité.")
 
 
-def main() -> int:
-    parser = argparse.ArgumentParser(
-        prog="dataguard",
-        description="Scanne un fichier ou un dossier à la recherche de données sensibles.",
-    )
-    parser.add_argument("target", help="Fichier ou dossier à analyser")
-    parser.add_argument(
-        "--json", action="store_true", help="Affiche le résultat au format JSON"
-    )
-    parser.add_argument(
-        "--strict",
-        action="store_true",
-        help="Code de sortie 1 dès qu'une fuite est trouvée (utile en CI)",
-    )
-    args = parser.parse_args()
-
+def cmd_scan(args: argparse.Namespace) -> int:
     try:
-        findings = scan(Path(args.target))
+        findings = detectors.scan(Path(args.target))
     except FileNotFoundError as e:
         print(e, file=sys.stderr)
         return 2
 
-    if args.json:
+    if args.html:
+        Path(args.html).write_text(
+            build_html(findings, args.target), encoding="utf-8"
+        )
+        print(f"Rapport HTML écrit dans {args.html}")
+    elif args.json:
         print(json.dumps([asdict(f) for f in findings], ensure_ascii=False, indent=2))
     else:
         print_report(findings)
@@ -246,6 +61,162 @@ def main() -> int:
     if args.strict and findings:
         return 1
     return 0
+
+
+# --- Sous-commande : phishing ---------------------------------------------
+
+def cmd_phishing(args: argparse.Namespace) -> int:
+    if args.text:
+        text = args.text
+    elif args.file:
+        try:
+            text = Path(args.file).read_text(encoding="utf-8", errors="ignore")
+        except OSError as e:
+            print(e, file=sys.stderr)
+            return 2
+    else:
+        text = sys.stdin.read()
+
+    score, signals = phishing.analyze(text)
+    level = phishing.risk_level(score)
+
+    if args.json:
+        print(
+            json.dumps(
+                {
+                    "score": score,
+                    "level": level,
+                    "signals": [
+                        {"category": s.category, "detail": s.detail, "weight": s.weight}
+                        for s in signals
+                    ],
+                },
+                ensure_ascii=False,
+                indent=2,
+            )
+        )
+    else:
+        print(f"Risque d'hameçonnage : {level} (score {score}/100)\n")
+        if not signals:
+            print("✓ Aucun indice d'hameçonnage relevé.")
+        for s in signals:
+            print(f"  • [{s.category}] {s.detail}")
+
+    if args.strict and level in {"MOYEN", "ÉLEVÉ"}:
+        return 1
+    return 0
+
+
+# --- Sous-commande : install-hook -----------------------------------------
+
+HOOK_TEMPLATE = """#!/bin/sh
+# Hook pre-commit installé par DataGuard.
+# Bloque le commit si des données sensibles sont détectées dans les
+# fichiers indexés.
+python3 "{script}" scan-staged --strict
+"""
+
+
+def _git_dir() -> Path | None:
+    """Retourne le dossier .git du dépôt courant, ou None."""
+    try:
+        out = subprocess.check_output(
+            ["git", "rev-parse", "--git-dir"], stderr=subprocess.DEVNULL, text=True
+        )
+        return Path(out.strip())
+    except (subprocess.CalledProcessError, FileNotFoundError):
+        return None
+
+
+def cmd_install_hook(args: argparse.Namespace) -> int:
+    git_dir = _git_dir()
+    if git_dir is None:
+        print("Erreur : ce dossier n'est pas un dépôt git.", file=sys.stderr)
+        return 2
+
+    hooks_dir = git_dir / "hooks"
+    hooks_dir.mkdir(parents=True, exist_ok=True)
+    hook_path = hooks_dir / "pre-commit"
+
+    if hook_path.exists() and not args.force:
+        print(
+            f"Un hook pre-commit existe déjà : {hook_path}\n"
+            "Relance avec --force pour l'écraser.",
+            file=sys.stderr,
+        )
+        return 1
+
+    script = Path(__file__).resolve()
+    hook_path.write_text(HOOK_TEMPLATE.format(script=script), encoding="utf-8")
+    hook_path.chmod(hook_path.stat().st_mode | stat.S_IEXEC | stat.S_IXGRP)
+    print(f"✓ Hook pre-commit installé : {hook_path}")
+    print("  Les commits contenant des secrets seront désormais bloqués.")
+    return 0
+
+
+def cmd_scan_staged(args: argparse.Namespace) -> int:
+    """Scanne uniquement les fichiers indexés (utilisé par le hook git)."""
+    try:
+        out = subprocess.check_output(
+            ["git", "diff", "--cached", "--name-only", "--diff-filter=ACM"],
+            text=True,
+        )
+    except (subprocess.CalledProcessError, FileNotFoundError) as e:
+        print(f"Erreur git : {e}", file=sys.stderr)
+        return 2
+
+    files = [Path(p) for p in out.splitlines() if p.strip()]
+    findings: list[detectors.Finding] = []
+    for path in files:
+        if path.is_file() and path.suffix.lower() not in detectors.BINARY_EXTENSIONS:
+            findings.extend(detectors.scan_file(path))
+
+    print_report(findings)
+    if args.strict and findings:
+        print("\n✗ Commit bloqué par DataGuard. Retire les secrets puis recommence.")
+        return 1
+    return 0
+
+
+# --- Analyseur d'arguments -------------------------------------------------
+
+def build_parser() -> argparse.ArgumentParser:
+    parser = argparse.ArgumentParser(
+        prog="dataguard",
+        description="Boîte à outils anti-fuite de données et anti-phishing.",
+    )
+    sub = parser.add_subparsers(dest="command", required=True)
+
+    p_scan = sub.add_parser("scan", help="Analyse un fichier ou un dossier")
+    p_scan.add_argument("target", help="Fichier ou dossier à analyser")
+    p_scan.add_argument("--json", action="store_true", help="Sortie JSON")
+    p_scan.add_argument("--html", metavar="FICHIER", help="Écrit un rapport HTML")
+    p_scan.add_argument("--strict", action="store_true", help="Code 1 si fuite trouvée")
+    p_scan.set_defaults(func=cmd_scan)
+
+    p_phish = sub.add_parser("phishing", help="Évalue le risque d'hameçonnage d'un texte")
+    src = p_phish.add_mutually_exclusive_group()
+    src.add_argument("--file", help="Fichier texte à analyser")
+    src.add_argument("--text", help="Texte à analyser directement")
+    p_phish.add_argument("--json", action="store_true", help="Sortie JSON")
+    p_phish.add_argument("--strict", action="store_true", help="Code 1 si risque moyen/élevé")
+    p_phish.set_defaults(func=cmd_phishing)
+
+    p_hook = sub.add_parser("install-hook", help="Installe le hook git pre-commit")
+    p_hook.add_argument("--force", action="store_true", help="Écrase un hook existant")
+    p_hook.set_defaults(func=cmd_install_hook)
+
+    p_staged = sub.add_parser("scan-staged", help="Scanne les fichiers indexés (git)")
+    p_staged.add_argument("--strict", action="store_true", help="Code 1 si fuite trouvée")
+    p_staged.set_defaults(func=cmd_scan_staged)
+
+    return parser
+
+
+def main() -> int:
+    parser = build_parser()
+    args = parser.parse_args()
+    return args.func(args)
 
 
 if __name__ == "__main__":
