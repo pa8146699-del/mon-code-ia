@@ -6,7 +6,7 @@ import ollama
 
 app = Flask(__name__)
 
-MODEL  = "tinyllama"   # ~600 Mo — changer selon RAM dispo (voir CLAUDE.md)
+MODEL  = "phi3:mini"   # ~2.2 Go — meilleur modèle pour téléphone ≤ 4 Go RAM
 _SYSTEM = (
     "Tu es Jarvis, un assistant personnel intelligent, concis et utile. "
     "Réponds en français sauf si l'utilisateur écrit dans une autre langue."

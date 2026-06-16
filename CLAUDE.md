@@ -45,9 +45,10 @@ L'interface web est une Progressive Web App. Dans Chrome sur Android :
 Modifier la constante `MODEL` dans `app.py` ou `jarvis.py` :
 
 ```python
-MODEL = "tinyllama"    # ~600 Mo  — défaut, tourne sur tout téléphone
-# MODEL = "phi3:mini"  # ~2.2 Go  — meilleure qualité, recommandé si ≥ 4 Go RAM
-# MODEL = "llama3.2:1b" # ~1.3 Go  — bon équilibre
+MODEL = "phi3:mini"    # ~2.2 Go  — défaut, meilleur pour ≤ 4 Go RAM
+# MODEL = "llama3.2:3b"  # ~2.0 Go  — excellent, pour 6 Go RAM
+# MODEL = "llama3.1:8b"  # ~4.7 Go  — le meilleur, pour 8 Go RAM+
+# MODEL = "tinyllama"    # ~600 Mo  — si la RAM est vraiment limitée
 ```
 
 `ollama list` pour voir les modèles installés, `ollama pull <nom>` pour en ajouter.

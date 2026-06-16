@@ -2,7 +2,7 @@
 # Lance Ollama (IA locale) + Jarvis en une commande
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
-MODEL="${JARVIS_MODEL:-tinyllama}"
+MODEL="${JARVIS_MODEL:-phi3:mini}"
 
 # Démarrer Ollama s'il n'est pas déjà lancé
 if ! pgrep -x ollama > /dev/null 2>&1; then

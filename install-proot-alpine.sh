@@ -4,7 +4,7 @@
 set -e
 
 REPO_DIR="$HOME/mon-code-ia"
-MODEL="${1:-tinyllama}"   # passer un autre modèle en argument si besoin
+MODEL="${1:-phi3:mini}"   # passer un autre modèle en argument si besoin
 
 echo "=== Installation de Jarvis + Ollama ==="
 
