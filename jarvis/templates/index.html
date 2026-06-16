@@ -200,9 +200,21 @@
 </header>
 
 <div id="messages">
-  <div class="bubble jarvis">
-    <div class="label label-ollama">JARVIS — LOCAL</div>Bonjour ! Comment puis-je vous aider ?
-  </div>
+  {% if history %}
+    {% for msg in history %}
+      {% if msg.role == "user" %}
+        <div class="bubble user">{{ msg.content }}</div>
+      {% else %}
+        <div class="bubble jarvis">
+          <div class="label label-ollama">JARVIS</div>{{ msg.content }}
+        </div>
+      {% endif %}
+    {% endfor %}
+  {% else %}
+    <div class="bubble jarvis">
+      <div class="label label-ollama">JARVIS — LOCAL</div>Bonjour ! Comment puis-je vous aider ?
+    </div>
+  {% endif %}
 </div>
 
 <div id="input-area">
@@ -220,6 +232,9 @@
 
   let busy = false;
   let currentBackend = 'ollama';
+
+  // Scroll au dernier message au chargement
+  msgBox.scrollTop = msgBox.scrollHeight;
 
   // ── Backend toggle ────────────────────────────────────────────────────────
   async function switchBackend(b) {
