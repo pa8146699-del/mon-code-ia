@@ -371,7 +371,21 @@
     </select>
   </div>
   <div>
-    <div class="s-label">Modèle Vision / Claude (👁️ analyse d'images)</div>
+    <div class="s-label">👁️ Vision Groq (analyse d'images — GRATUIT)</div>
+    <select class="s-select" id="s-groq-vision">
+      <option value="meta-llama/llama-4-scout-17b-16e-instruct">Llama 4 Scout — recommandé</option>
+      <option value="meta-llama/llama-4-maverick-17b-128e-instruct">Llama 4 Maverick — + puissant</option>
+    </select>
+  </div>
+  <div>
+    <div class="s-label">👁️ Vision locale Ollama (hors-ligne — GRATUIT)</div>
+    <select class="s-select" id="s-ollama-vision">
+      <option value="moondream">moondream — 1.7 Go (≤ 4 Go RAM)</option>
+      <option value="llava:7b">llava 7b — 4.7 Go (8 Go RAM)</option>
+    </select>
+  </div>
+  <div>
+    <div class="s-label">👁️ Vision Claude (optionnel — PAYANT)</div>
     <select class="s-select" id="s-claude">
       <option value="claude-fable-5">Claude Fable 5 — le plus intelligent</option>
       <option value="claude-opus-4-8">Claude Opus 4.8 — très puissant</option>
@@ -414,6 +428,7 @@ let backend = 'ollama';
 let voiceOn = {{ 'true' if settings.voice_enabled else 'false' }};
 let allSessions = [];
 const claudeAvailable = {{ 'true' if claude_available else 'false' }};
+const groqAvailable   = {{ 'true' if groq_available else 'false' }};
 let attachedImages = [];   // data-URLs base64 des images jointes
 
 // Marked config
@@ -588,8 +603,12 @@ async function send() {
   }
   userWrap.appendChild(document.createTextNode(text));
 
-  // Une image force le backend vision (Claude) s'il est disponible
-  const replyBackend = (imgs.length && claudeAvailable) ? 'claude' : backend;
+  // Une image force un backend qui « voit ». Priorité au gratuit : Groq, puis Claude.
+  let replyBackend = backend;
+  if (imgs.length) {
+    if (groqAvailable)        replyBackend = 'groq';
+    else if (claudeAvailable) replyBackend = 'claude';
+  }
   const replyWrap = mkBubble('assistant', replyBackend);
   const mdEl = replyWrap.querySelector('.md-content');
   let fullText = '';
@@ -764,20 +783,24 @@ async function delMemory(i) {
 // ── Settings ──────────────────────────────────────────────────────────────────
 async function loadSettings() {
   const s = await fetch('/settings').then(r => r.json());
-  document.getElementById('s-ollama').value = s.ollama_model;
-  document.getElementById('s-groq').value   = s.groq_model;
-  document.getElementById('s-claude').value = s.claude_model;
-  document.getElementById('s-prompt').value  = s.system_prompt;
+  document.getElementById('s-ollama').value        = s.ollama_model;
+  document.getElementById('s-ollama-vision').value = s.ollama_vision_model;
+  document.getElementById('s-groq').value          = s.groq_model;
+  document.getElementById('s-groq-vision').value   = s.groq_vision_model;
+  document.getElementById('s-claude').value        = s.claude_model;
+  document.getElementById('s-prompt').value         = s.system_prompt;
   voiceOn = s.voice_enabled;
   document.getElementById('s-voice').classList.toggle('on', !!s.voice_enabled);
 }
 async function saveSettings() {
   const data = {
-    ollama_model:  document.getElementById('s-ollama').value,
-    groq_model:    document.getElementById('s-groq').value,
-    claude_model:  document.getElementById('s-claude').value,
-    system_prompt: document.getElementById('s-prompt').value,
-    voice_enabled: document.getElementById('s-voice').classList.contains('on'),
+    ollama_model:         document.getElementById('s-ollama').value,
+    ollama_vision_model:  document.getElementById('s-ollama-vision').value,
+    groq_model:           document.getElementById('s-groq').value,
+    groq_vision_model:    document.getElementById('s-groq-vision').value,
+    claude_model:         document.getElementById('s-claude').value,
+    system_prompt:        document.getElementById('s-prompt').value,
+    voice_enabled:        document.getElementById('s-voice').classList.contains('on'),
   };
   voiceOn = data.voice_enabled;
   await post('/settings', data);

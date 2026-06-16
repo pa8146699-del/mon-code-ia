@@ -18,9 +18,11 @@ SETTINGS_FILE = DATA / "settings.json"
 PINS_FILE     = DATA / "pins.json"
 
 DEFAULT_SETTINGS = {
-    "ollama_model":  "phi3:mini",
-    "groq_model":    "llama-3.3-70b-versatile",
-    "claude_model":  "claude-fable-5",
+    "ollama_model":         "phi3:mini",
+    "ollama_vision_model":  "moondream",                                  # vision locale gratuite (~1.7 Go)
+    "groq_model":           "llama-3.3-70b-versatile",
+    "groq_vision_model":    "meta-llama/llama-4-scout-17b-16e-instruct",  # vision Groq gratuite
+    "claude_model":         "claude-fable-5",
     "system_prompt": (
         "Tu es Jarvis, un assistant personnel intelligent, concis et utile. "
         "Tu réponds en Markdown quand c'est pertinent (listes, code, titres). "
@@ -184,9 +186,15 @@ def chat():
     sys = _system_prompt()
 
     # Si une image est envoyée, on bascule sur un backend qui sait « voir ».
+    # Priorité aux options GRATUITES : Groq d'abord, puis Claude, sinon Ollama local.
+    has_imgs = _history_has_images(history)
     use = _backend
-    if _history_has_images(history) and _anthropic and use != "claude":
-        use = "claude"
+    if has_imgs:
+        if _groq:
+            use = "groq"
+        elif _anthropic:
+            use = "claude"
+        # sinon on reste sur Ollama (nécessite un modèle vision, ex: moondream)
 
     def generate():
         full = ""
@@ -203,8 +211,9 @@ def chat():
                             full += tok
                             yield _sse({"token": tok})
             elif use == "groq" and _groq:
+                model = _settings["groq_vision_model"] if has_imgs else _settings["groq_model"]
                 stream = _groq.chat.completions.create(
-                    model=_settings["groq_model"],
+                    model=model,
                     messages=[{"role": "system", "content": sys}] + _groq_msgs(history),
                     max_tokens=2048,
                     stream=True,
@@ -215,8 +224,9 @@ def chat():
                         full += tok
                         yield _sse({"token": tok})
             else:
+                model = _settings["ollama_vision_model"] if has_imgs else _settings["ollama_model"]
                 stream = ollama.chat(
-                    model=_settings["ollama_model"],
+                    model=model,
                     messages=[{"role": "system", "content": sys}] + _ollama_msgs(history),
                     stream=True,
                 )
