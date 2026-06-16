@@ -1,0 +1,12 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+
+# Données locales de Jarvis (sessions, mémoire, réglages)
+jarvis/data/
+
+# Logs
+*.log
