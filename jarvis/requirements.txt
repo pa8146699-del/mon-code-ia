@@ -1,6 +1,7 @@
 ollama>=0.4.0
+flask>=3.0.0
 
-# Dépendances vocales (optionnelles, nécessaires uniquement avec --voice)
+# Dépendances vocales CLI (optionnelles, uniquement pour jarvis.py --voice)
 SpeechRecognition>=3.10.0
 pyttsx3>=2.90
 PyAudio>=0.2.14

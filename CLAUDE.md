@@ -4,15 +4,17 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-`mon-code-ia` is a personal AI assistant project. The main component is `jarvis/`, a Python-based vocal/text assistant powered by **Ollama** (local AI, free, no API key required).
+`mon-code-ia` is a personal AI assistant project. The main component is `jarvis/`, a Python-based assistant powered by **Ollama** (local AI, free, no API key required). It has two interfaces:
+
+- `jarvis.py` — CLI terminal (text or voice via microphone)
+- `app.py` — Web server with a mobile-friendly chat UI accessible from any browser/phone on the same Wi-Fi
 
 ## Setup
 
 ```bash
-# 1. Installer Ollama (https://ollama.com)
-#    Linux :
-curl -fsSL https://ollama.com/install.sh | sh
-#    macOS/Windows : télécharger depuis https://ollama.com/download
+# 1. Installer Ollama — https://ollama.com
+curl -fsSL https://ollama.com/install.sh | sh   # Linux
+# macOS/Windows : télécharger depuis https://ollama.com/download
 
 # 2. Télécharger le modèle (une seule fois, ~2 Go)
 ollama pull llama3.2
@@ -21,49 +23,61 @@ ollama pull llama3.2
 pip install -r jarvis/requirements.txt
 ```
 
-## Running Jarvis
+## Running
 
 ```bash
-# Mode texte (terminal)
+# Interface web (téléphone / navigateur)
+python jarvis/app.py
+# → http://localhost:5000  ou  http://<IP-du-PC>:5000 depuis le téléphone
+
+# CLI texte
 python jarvis/jarvis.py
 
-# Mode vocal (microphone + synthèse vocale)
+# CLI vocal (microphone + synthèse vocale)
 python jarvis/jarvis.py --voice
 ```
 
-Ollama doit tourner en arrière-plan (lancé automatiquement après installation, ou manuellement avec `ollama serve`).
+Ollama doit tourner en arrière-plan (automatique après installation, ou `ollama serve`).
 
 ## Changer de modèle
 
-Modifier la constante `MODEL` dans `jarvis/jarvis.py` :
+Modifier la constante `MODEL` dans `app.py` ou `jarvis.py` :
 
 ```python
-MODEL = "llama3.2"      # par défaut (~2 Go)
-# MODEL = "mistral"     # alternative (~4 Go)
-# MODEL = "phi3"        # très léger (~2 Go)
+MODEL = "llama3.2"   # par défaut (~2 Go)
+# MODEL = "mistral"  # ~4 Go
+# MODEL = "phi3"     # très léger
 ```
 
-Liste des modèles disponibles : `ollama list` / `ollama pull <nom>`.
+`ollama list` liste les modèles installés ; `ollama pull <nom>` en télécharge un nouveau.
 
 ## Architecture
 
+### `jarvis/app.py`
+Serveur Flask exposé sur `0.0.0.0:5000`.
+- `GET /` — sert `templates/index.html`
+- `POST /chat` — reçoit `{message}`, appelle Ollama, retourne `{reply}`
+- `POST /reset` — vide l'historique de conversation
+
+L'historique (`_history`) est conservé en mémoire pour toute la session du serveur (global, mono-utilisateur).
+
+### `jarvis/templates/index.html`
+Interface chat sans dépendance externe (CSS/JS vanilla).
+- Micro via **Web Speech API** du navigateur (Chrome/Edge/Safari)
+- Synthèse vocale via **SpeechSynthesis** du navigateur
+- Bulles de chat, indicateur de frappe animé, bouton "Nouvelle conv."
+
 ### `jarvis/jarvis.py`
-
-- `read_input()` — lit une commande depuis stdin (mode texte)
-- `listen()` — capte le micro et transcrit via Google Speech Recognition (mode `--voice`)
-- `respond(user_message)` — envoie le message à Ollama avec l'historique complet et retourne la réponse
-- `speak(text)` — synthèse vocale via pyttsx3 (mode `--voice` uniquement)
-- `main()` — boucle principale ; quitte sur "quitter"/"stop"/"exit"/"quit"
-
-L'historique (`_history`) est conservé en mémoire le temps de la session.
+CLI alternatif (même logique, sans Flask).
+- Mode texte : `read_input()` + `respond()` en boucle
+- Mode vocal (`--voice`) : `listen()` via SpeechRecognition + `speak()` via pyttsx3
 
 ### Dependencies
 
-| Package | Purpose |
+| Package | Usage |
 |---|---|
-| `ollama` | Client Ollama — IA locale gratuite (obligatoire) |
-| `SpeechRecognition` | Microphone → texte (mode vocal) |
-| `pyttsx3` | Texte → parole, fonctionne hors ligne (mode vocal) |
-| `PyAudio` | Backend audio pour SpeechRecognition (mode vocal) |
-
-Les dépendances vocales ne sont importées que si `--voice` est passé.
+| `ollama` | Client Ollama (IA locale gratuite) — obligatoire |
+| `flask` | Serveur web pour `app.py` — obligatoire |
+| `SpeechRecognition` | Micro → texte pour CLI vocal |
+| `pyttsx3` | Texte → parole pour CLI vocal |
+| `PyAudio` | Backend audio pour SpeechRecognition |
