@@ -12,7 +12,7 @@ source.dir = .
 source.include_exts = py,png,jpg,kv,atlas
 
 # Version de l'application
-version = 1.0
+version = 1.1
 
 # Dépendances Python embarquées dans l'APK
 requirements = python3,kivy
@@ -30,6 +30,9 @@ android.archs = arm64-v8a, armeabi-v7a
 
 # Accepter automatiquement les licences du SDK Android (indispensable en CI)
 android.accept_sdk_license = True
+
+# Permission lecture stockage pour le sélecteur de fichiers
+android.permissions = READ_EXTERNAL_STORAGE
 
 # Autoriser la sauvegarde
 android.allow_backup = 1
