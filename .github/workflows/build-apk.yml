@@ -16,18 +16,26 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
+    # Image officielle Kivy : Java + dépendances Buildozer déjà installés.
+    container:
+      image: ghcr.io/kivy/buildozer:latest
+      options: --user root
+    env:
+      # Autorise Buildozer à tourner en root dans le conteneur CI.
+      BUILDOZER_WARN_ON_ROOT: "0"
     steps:
       - name: Récupérer le code
         uses: actions/checkout@v4
+
+      - name: Marquer le dossier comme sûr pour git
+        run: git config --global --add safe.directory "$GITHUB_WORKSPACE"
 
       - name: Copier la logique DataGuard dans mobile/
         run: cp dataguard/detectors.py dataguard/phishing.py mobile/
 
       - name: Construire l'APK avec Buildozer
-        uses: ArtemSBulgakov/buildozer-action@v1
-        with:
-          workdir: mobile
-          command: buildozer android debug
+        working-directory: mobile
+        run: buildozer android debug
 
       - name: Publier l'APK en artéfact
         uses: actions/upload-artifact@v4
