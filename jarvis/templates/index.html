@@ -60,9 +60,10 @@
       border: none; cursor: pointer; background: transparent; color: var(--muted);
       transition: background .2s, color .2s;
     }
-    .back-btn.on-local { background: var(--border); color: var(--accent); }
-    .back-btn.on-groq  { background: #4c1d95; color: var(--groq); }
-    .back-btn:disabled { opacity: .3; cursor: not-allowed; }
+    .back-btn.on-local  { background: var(--border); color: var(--accent); }
+    .back-btn.on-groq   { background: #4c1d95; color: var(--groq); }
+    .back-btn.on-claude { background: #7c2d12; color: #fb923c; }
+    .back-btn:disabled  { opacity: .3; cursor: not-allowed; }
 
     /* ── Tab bar ── */
     #tab-bar {
@@ -98,8 +99,16 @@
     .bubble .label {
       font-size: 0.65rem; font-weight: 800; letter-spacing: .1em; margin-bottom: 6px;
     }
-    .label-local { color: var(--accent); }
-    .label-groq  { color: var(--groq); }
+    .label-local  { color: var(--accent); }
+    .label-groq   { color: var(--groq); }
+    .label-claude { color: #fb923c; }
+
+    /* Images dans les bulles */
+    .bubble .bubble-imgs { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 6px; }
+    .bubble .bubble-imgs img {
+      max-width: 160px; max-height: 160px; border-radius: 10px;
+      object-fit: cover; cursor: pointer; border: 1px solid rgba(255,255,255,.2);
+    }
 
     /* Markdown dans les bulles */
     .bubble.jarvis h1,.bubble.jarvis h2,.bubble.jarvis h3 { margin: 10px 0 4px; line-height: 1.3; }
@@ -141,12 +150,30 @@
     .typing span:nth-child(3) { animation-delay: .4s; }
     @keyframes bounce { 0%,60%,100% { transform:translateY(0);opacity:.35; } 30% { transform:translateY(-6px);opacity:1; } }
 
+    /* ── Aperçu des images jointes ── */
+    #img-preview {
+      display: none; gap: 8px; padding: 8px 12px 0; flex-wrap: wrap;
+      background: var(--surface);
+    }
+    #img-preview.show { display: flex; }
+    .img-thumb { position: relative; }
+    .img-thumb img {
+      width: 60px; height: 60px; object-fit: cover; border-radius: 10px;
+      border: 1px solid var(--border);
+    }
+    .img-thumb .rm {
+      position: absolute; top: -6px; right: -6px; width: 20px; height: 20px;
+      border-radius: 50%; border: none; background: var(--danger); color: #fff;
+      font-size: 0.7rem; cursor: pointer; line-height: 1;
+    }
+
     /* ── Input area ── */
     #input-area {
       padding: 10px 12px; padding-bottom: max(10px, env(safe-area-inset-bottom));
       background: var(--surface); border-top: 1px solid var(--border);
       display: flex; gap: 8px; align-items: flex-end; flex-shrink: 0;
     }
+    #attach-btn { background: var(--border); }
     #msg-input {
       flex: 1; background: var(--bg); border: 1px solid var(--border);
       border-radius: 22px; padding: 10px 16px; color: var(--text);
@@ -270,6 +297,8 @@
     <button class="back-btn on-local" id="btn-local" onclick="switchBackend('ollama')">📱</button>
     <button class="back-btn" id="btn-groq" onclick="switchBackend('groq')"
       {% if not groq_available %}disabled title="GROQ_API_KEY manquante"{% endif %}>☁️</button>
+    <button class="back-btn" id="btn-claude" onclick="switchBackend('claude')"
+      {% if not claude_available %}disabled title="ANTHROPIC_API_KEY manquante"{% endif %}>👁️</button>
   </div>
   <button class="hdr-btn" id="theme-btn" onclick="toggleTheme()">🌙</button>
   <button class="hdr-btn" onclick="newSession()">＋</button>
@@ -288,7 +317,10 @@
     {% if history %}
       {% for m in history %}
         {% if m.role == 'user' %}
-          <div class="bubble user">{{ m.content }}</div>
+          <div class="bubble user">
+            {% if m.images %}<div class="bubble-imgs">{% for im in m.images %}<img src="{{ im }}" onclick="window.open(this.src)">{% endfor %}</div>{% endif %}
+            {{ m.content }}
+          </div>
         {% else %}
           <div class="bubble jarvis"><div class="label label-local">JARVIS</div><div class="md-content">{{ m.content }}</div></div>
         {% endif %}
@@ -339,6 +371,15 @@
     </select>
   </div>
   <div>
+    <div class="s-label">Modèle Vision / Claude (👁️ analyse d'images)</div>
+    <select class="s-select" id="s-claude">
+      <option value="claude-fable-5">Claude Fable 5 — le plus intelligent</option>
+      <option value="claude-opus-4-8">Claude Opus 4.8 — très puissant</option>
+      <option value="claude-sonnet-4-6">Claude Sonnet 4.6 — rapide</option>
+      <option value="claude-haiku-4-5">Claude Haiku 4.5 — léger</option>
+    </select>
+  </div>
+  <div>
     <div class="s-label">Personnalité de Jarvis</div>
     <textarea class="s-textarea" id="s-prompt" rows="3"></textarea>
   </div>
@@ -352,11 +393,16 @@
   <button id="save-btn" onclick="saveSettings()">Sauvegarder</button>
 </div>
 
+<!-- Aperçu des images jointes -->
+<div id="img-preview"></div>
+
 <!-- Input -->
 <div id="input-area">
+  <button class="act-btn" id="attach-btn" title="Joindre une image">📎</button>
   <button class="act-btn" id="mic-btn">🎤</button>
   <textarea id="msg-input" placeholder="Votre message…" rows="1"></textarea>
   <button class="act-btn" id="send-btn">▶</button>
+  <input type="file" id="file-input" accept="image/*" multiple hidden>
 </div>
 
 <script>
@@ -367,6 +413,8 @@ let busy = false;
 let backend = 'ollama';
 let voiceOn = {{ 'true' if settings.voice_enabled else 'false' }};
 let allSessions = [];
+const claudeAvailable = {{ 'true' if claude_available else 'false' }};
+let attachedImages = [];   // data-URLs base64 des images jointes
 
 // Marked config
 if (typeof marked !== 'undefined') {
@@ -445,10 +493,14 @@ setTimeout(() => { const v = document.getElementById('view-chat'); v.scrollTop =
 async function switchBackend(b) {
   if (b === backend) return;
   const r = await post('/backend', { backend: b });
-  if (r.error) { alert('Groq non disponible.'); return; }
+  if (r.error) { alert(r.error); return; }
   backend = b;
-  document.getElementById('btn-local').className = 'back-btn' + (b==='ollama' ? ' on-local' : '');
-  document.getElementById('btn-groq').className  = 'back-btn' + (b==='groq'   ? ' on-groq'  : '');
+  setBackendButtons(b);
+}
+function setBackendButtons(b) {
+  document.getElementById('btn-local').className  = 'back-btn' + (b==='ollama' ? ' on-local'  : '');
+  document.getElementById('btn-groq').className   = 'back-btn' + (b==='groq'   ? ' on-groq'   : '');
+  document.getElementById('btn-claude').className = 'back-btn' + (b==='claude' ? ' on-claude' : '');
 }
 
 // ── Chat + Streaming ──────────────────────────────────────────────────────────
@@ -463,13 +515,19 @@ document.getElementById('send-btn').addEventListener('click', send);
 
 function scrollBottom() { const v = document.getElementById('view-chat'); v.scrollTop = v.scrollHeight; }
 
+const BACKEND_LABEL = {
+  groq:   { cls: 'label-groq',   txt: 'JARVIS — GROQ ☁️' },
+  claude: { cls: 'label-claude', txt: 'JARVIS — VISION 👁️' },
+  ollama: { cls: 'label-local',  txt: 'JARVIS — LOCAL 📱' },
+};
 function mkBubble(role, backend_) {
   const wrap = document.createElement('div');
   wrap.className = 'bubble ' + (role==='user' ? 'user' : 'jarvis' + (backend_==='groq' ? ' groq' : ''));
   if (role !== 'user') {
+    const info = BACKEND_LABEL[backend_] || BACKEND_LABEL.ollama;
     const lbl = document.createElement('div');
-    lbl.className = 'label ' + (backend_==='groq' ? 'label-groq' : 'label-local');
-    lbl.textContent = backend_==='groq' ? 'JARVIS — GROQ ☁️' : 'JARVIS — LOCAL 📱';
+    lbl.className = 'label ' + info.cls;
+    lbl.textContent = info.txt;
     wrap.appendChild(lbl);
     const md = document.createElement('div');
     md.className = 'md-content streaming';
@@ -480,18 +538,59 @@ function mkBubble(role, backend_) {
   return wrap;
 }
 
+// ── Images jointes ──────────────────────────────────────────────────────────────
+document.getElementById('attach-btn').addEventListener('click', () =>
+  document.getElementById('file-input').click());
+document.getElementById('file-input').addEventListener('change', e => {
+  for (const file of e.target.files) {
+    if (!file.type.startsWith('image/')) continue;
+    const reader = new FileReader();
+    reader.onload = ev => { attachedImages.push(ev.target.result); renderPreview(); };
+    reader.readAsDataURL(file);
+  }
+  e.target.value = '';
+});
+function renderPreview() {
+  const box = document.getElementById('img-preview');
+  box.innerHTML = '';
+  box.classList.toggle('show', attachedImages.length > 0);
+  attachedImages.forEach((src, i) => {
+    const d = document.createElement('div');
+    d.className = 'img-thumb';
+    d.innerHTML = `<img src="${src}"><button class="rm" onclick="removeImage(${i})">✕</button>`;
+    box.appendChild(d);
+  });
+}
+function removeImage(i) { attachedImages.splice(i, 1); renderPreview(); }
+
 async function send() {
   const text = msgInput.value.trim();
-  if (!text || busy) return;
+  const imgs = attachedImages.slice();
+  if ((!text && !imgs.length) || busy) return;
   msgInput.value = ''; msgInput.style.height = 'auto'; busy = true;
+  attachedImages = []; renderPreview();
 
   // Remove placeholder
   const ph = msgBox.querySelector('.placeholder-msg');
   if (ph) ph.remove();
 
-  mkBubble('user');
-  msgBox.lastChild.textContent = text;
-  const replyWrap = mkBubble('assistant', backend);
+  // Bulle utilisateur avec aperçu des images
+  const userWrap = mkBubble('user');
+  if (imgs.length) {
+    const strip = document.createElement('div');
+    strip.className = 'bubble-imgs';
+    imgs.forEach(src => {
+      const im = document.createElement('img');
+      im.src = src; im.onclick = () => window.open(src);
+      strip.appendChild(im);
+    });
+    userWrap.appendChild(strip);
+  }
+  userWrap.appendChild(document.createTextNode(text));
+
+  // Une image force le backend vision (Claude) s'il est disponible
+  const replyBackend = (imgs.length && claudeAvailable) ? 'claude' : backend;
+  const replyWrap = mkBubble('assistant', replyBackend);
   const mdEl = replyWrap.querySelector('.md-content');
   let fullText = '';
 
@@ -499,7 +598,7 @@ async function send() {
     const resp = await fetch('/chat', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ message: text }),
+      body: JSON.stringify({ message: text, images: imgs }),
     });
 
     const reader = resp.body.getReader();
@@ -535,6 +634,10 @@ async function send() {
           if (d.done) {
             mdEl.classList.remove('streaming');
             applyMd(mdEl, fullText);
+            // Corrige le libellé si le serveur a basculé de backend (ex: vision)
+            const lbl = replyWrap.querySelector('.label');
+            const info = BACKEND_LABEL[d.backend] || BACKEND_LABEL.ollama;
+            if (lbl) { lbl.className = 'label ' + info.cls; lbl.textContent = info.txt; }
             if (d.title) document.getElementById('session-title').textContent = d.title;
             if (voiceOn) speak(fullText.replace(/<[^>]+>/g,''));
             scrollBottom();
@@ -663,6 +766,7 @@ async function loadSettings() {
   const s = await fetch('/settings').then(r => r.json());
   document.getElementById('s-ollama').value = s.ollama_model;
   document.getElementById('s-groq').value   = s.groq_model;
+  document.getElementById('s-claude').value = s.claude_model;
   document.getElementById('s-prompt').value  = s.system_prompt;
   voiceOn = s.voice_enabled;
   document.getElementById('s-voice').classList.toggle('on', !!s.voice_enabled);
@@ -671,6 +775,7 @@ async function saveSettings() {
   const data = {
     ollama_model:  document.getElementById('s-ollama').value,
     groq_model:    document.getElementById('s-groq').value,
+    claude_model:  document.getElementById('s-claude').value,
     system_prompt: document.getElementById('s-prompt').value,
     voice_enabled: document.getElementById('s-voice').classList.contains('on'),
   };

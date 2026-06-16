@@ -27,8 +27,8 @@ else
 fi
 
 # Dépendances Python
-pip3 install --break-system-packages flask ollama 2>/dev/null \
-    || pip3 install flask ollama
+pip3 install --break-system-packages flask ollama groq anthropic 2>/dev/null \
+    || pip3 install flask ollama groq anthropic
 
 # Télécharger le modèle IA
 echo "--- Démarrage d'Ollama pour télécharger le modèle $MODEL..."
