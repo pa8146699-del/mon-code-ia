@@ -11,7 +11,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - `mobile/` — a Kivy GUI wrapper around DataGuard, built into an Android APK by GitHub Actions.
 - `monappli/` — a second, personal Kivy security app reusing DataGuard, with its own combined "Tout analyser" action and its own APK build.
 
-`jarvis/` and `dataguard/` share no code. Both `mobile/` and `monappli/` reuse `dataguard/detectors.py` and `dataguard/phishing.py` (copied in at build time, never committed under those folders).
+`jarvis/` and `dataguard/` share no code. `mobile/` reuses `dataguard/detectors.py` and `dataguard/phishing.py`; `monappli/` reuses those two plus `dataguard/toolkit.py`. All three files are copied in at build time and never committed under those folders.
 
 ## Repository Layout
 
@@ -44,7 +44,7 @@ mon-code-ia/
     └── README.md
 ```
 
-Files git-ignored under `mobile/` and `monappli/`: `detectors.py`, `phishing.py`, `bin/`, `.buildozer/`, `*.apk`.
+Files git-ignored under `mobile/`: `detectors.py`, `phishing.py`, `bin/`, `.buildozer/`, `*.apk`. Under `monappli/`: same plus `toolkit.py`.
 
 ## Setup
 
