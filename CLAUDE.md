@@ -9,8 +9,42 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - `jarvis/` — a vocal/text assistant powered by the Claude API.
 - `dataguard/` — a command-line data-leak / phishing security toolkit (no external dependencies).
 - `mobile/` — a Kivy GUI wrapper around DataGuard, built into an Android APK by GitHub Actions.
+- `monappli/` — a second, personal Kivy security app reusing DataGuard, with its own combined "Tout analyser" action and its own APK build.
 
-`jarvis/` and `dataguard/` share no code. `mobile/` reuses `dataguard/detectors.py` and `dataguard/phishing.py` (copied in at build time, never committed under `mobile/`).
+`jarvis/` and `dataguard/` share no code. Both `mobile/` and `monappli/` reuse `dataguard/detectors.py` and `dataguard/phishing.py` (copied in at build time, never committed under those folders).
+
+## Repository Layout
+
+```
+mon-code-ia/
+├── .github/workflows/
+│   ├── build-apk.yml                 # CI: mobile/ Android APK builder
+│   └── build-monappli.yml            # CI: monappli/ Android APK builder
+├── .gitignore
+├── CLAUDE.md
+├── README.md
+├── jarvis/
+│   ├── jarvis.py                     # Single-file assistant (~100 lines)
+│   └── requirements.txt
+├── dataguard/
+│   ├── dataguard.py                  # Argparse dispatcher (cmd_* functions)
+│   ├── detectors.py                  # Secret-detection engine + Luhn + redact
+│   ├── phishing.py                   # Heuristic phishing scorer
+│   ├── toolkit.py                    # Password strength/gen + hashing (stdlib)
+│   ├── report.py                     # HTML report generator
+│   ├── test_dataguard.py             # Test suite (pytest + zero-dep runner)
+│   └── README.md
+├── mobile/
+│   ├── main.py                       # Kivy GUI (touch-friendly)
+│   ├── buildozer.spec                # Android build config
+│   └── README.md
+└── monappli/
+    ├── main.py                       # Personal Kivy GUI (adds "Tout analyser")
+    ├── buildozer.spec                # Android build config
+    └── README.md
+```
+
+Files git-ignored under `mobile/` and `monappli/`: `detectors.py`, `phishing.py`, `bin/`, `.buildozer/`, `*.apk`.
 
 ## Setup
 
@@ -22,65 +56,173 @@ export ANTHROPIC_API_KEY=your-key-here
 ## Running Jarvis
 
 ```bash
-# Text mode (terminal only)
-python jarvis/jarvis.py
-
-# Voice mode (microphone input + speech synthesis)
-python jarvis/jarvis.py --voice
+python jarvis/jarvis.py          # text mode (terminal only)
+python jarvis/jarvis.py --voice  # voice mode (microphone + speech synthesis)
 ```
 
-## Architecture
+## Jarvis Architecture
 
 `jarvis/jarvis.py` is a single-file application (~100 lines). Key design points:
 
-- **Voice dependency loading** is conditional at module level (not lazy): if `--voice` is in `sys.argv`, `pyttsx3` and `speech_recognition` are imported immediately on startup. This means a missing voice dependency crashes at import time, not at first use.
-- **Conversation state** (`_history: list[dict]`) is a module-level global. It accumulates the full turn-by-turn exchange and is passed to every Claude API call, giving multi-turn context. It is lost when the process exits.
+- **Voice dependency loading** is conditional at module level (not lazy): if `--voice` is in `sys.argv`, `pyttsx3` and `speech_recognition` are imported immediately on startup. A missing voice dependency crashes at import time, not at first use.
+- **Conversation state** (`_history: list[dict]`) is a module-level global. It accumulates the full turn-by-turn exchange and is passed to every Claude API call, giving multi-turn context. Lost when the process exits.
 - **Model and limits**: hardcoded to `claude-sonnet-4-6` with `max_tokens=1024`.
 - **Language**: the system prompt instructs Claude to reply in French by default, switching to the user's language if they write in another one.
 - **Exit keywords**: `"quitter"`, `"stop"`, `"exit"`, `"quit"` (checked case-insensitively) terminate the loop.
-- `ANTHROPIC_API_KEY` is read directly from the environment via `os.environ["ANTHROPIC_API_KEY"]` — it will raise `KeyError` if unset.
+- `ANTHROPIC_API_KEY` is read via `os.environ["ANTHROPIC_API_KEY"]` — raises `KeyError` if unset.
 
 ## DataGuard
 
 `dataguard/` is a self-contained security toolkit (Python 3 standard library only) exposed through subcommands on `dataguard.py`:
 
 ```bash
-python dataguard/dataguard.py                          # interactive menu (default with no args)
+python dataguard/dataguard.py                              # interactive menu (default with no args)
+python dataguard/dataguard.py menu                         # same, explicit
 python dataguard/dataguard.py scan <file-or-dir> [--json|--html FILE] [--strict]
 python dataguard/dataguard.py phishing [--text STR | --file PATH] [--json] [--strict]
 python dataguard/dataguard.py install-hook [--force]
-python dataguard/dataguard.py scan-staged [--strict]   # used by the git hook
+python dataguard/dataguard.py scan-staged [--strict]       # used by the git hook
+```
+
+`phishing` also reads from stdin when neither `--text` nor `--file` is given:
+```bash
+cat mail.txt | python dataguard/dataguard.py phishing
 ```
 
 Module layout (all flat, imported by simple name since `dataguard/` is on `sys.path[0]` when run directly):
 
-- `dataguard.py` — argparse subcommand dispatch (`cmd_*` functions). Each subcommand maps to `func` via `set_defaults`.
-- `detectors.py` — the `DETECTORS` list and scanning logic (`scan`, `scan_file`, `scan_line`, `sort_findings`). Extend coverage by adding a `Detector(name, compiled_regex, severity)` entry. Credit-card hits are confirmed with the **Luhn checksum** (`luhn_valid`); all reported values are **redacted** (`redact`).
+- `dataguard.py` — argparse subcommand dispatch (`cmd_*` functions). Each subcommand sets `func` via `set_defaults`. Interactive menu is `cmd_menu` (options 1–4).
+- `detectors.py` — the `DETECTORS` list and scanning logic (`scan`, `scan_file`, `scan_line`, `sort_findings`). Extend coverage by adding a `Detector(name, compiled_regex, severity)` entry. Credit-card hits are confirmed with the **Luhn checksum** (`luhn_valid`); all reported values are **redacted** (`redact`: first 4 chars + `***` + last 2 chars).
 - `phishing.py` — heuristic phishing scorer. `analyze(text)` returns `(score 0-100, [PhishingSignal])`; lookalike-domain detection normalizes digit-for-letter swaps (`paypa1` → `paypal`) and skips legitimate `brand.tld` hosts.
+- `toolkit.py` — extra stdlib-only security utilities (no detection): `password_strength(pw)` → `PasswordReport(score, level, entropy_bits, issues, tips)`; `generate_password(length, use_symbols)` using the `secrets` module (guarantees one char per required class, shuffles with `secrets.randbelow`); `hash_text(text)` → `{SHA-256, SHA-1, MD5}` hexdigests. Consumed by `monappli/`.
 - `report.py` — standalone HTML report (`build_html`); never embeds raw secrets.
 
-`scan-staged` + `install-hook` implement a git `pre-commit` guard: the hook calls `scan-staged --strict` to block commits whose staged files contain secrets. The hook is written to `$(git rev-parse --git-dir)/hooks/pre-commit`. **Do not run `install-hook` from inside this repo's working tree** — it would install a pre-commit hook into `mon-code-ia/.git` and block your own commits; test it in a throwaway repo instead.
+### What `scan` detects
 
-Tests live in `dataguard/test_dataguard.py` and import the modules by name, so run them from inside `dataguard/`:
+| Type | Severity |
+|---|---|
+| Private key (RSA, EC, OpenSSH…) | HIGH |
+| AWS access key | HIGH |
+| API keys: Anthropic, OpenAI, Google, Stripe, SendGrid | HIGH |
+| GitHub token, Slack token, Google OAuth token | HIGH |
+| Plaintext password | HIGH |
+| IBAN | HIGH |
+| Credit card number (Luhn-validated) | HIGH |
+| JWT token, Slack webhook, generic secret/api_key/token | MEDIUM |
+| Email address, FR phone number, IPv4 address | LOW |
+
+Binary files (`.png`, `.jpg`, `.pdf`, `.pyc`, `.zip`, `.mp4`, `.ttf`, `.so`, etc.) and directories (`.git`, `__pycache__`, `node_modules`, `venv`, `.venv`, `.mypy_cache`) are skipped during directory scans.
+
+### Phishing scoring signals
+
+`analyze(text)` sums weighted signals (capped at 100):
+
+| Signal | Weight |
+|---|---|
+| Urgency language ("urgent", "immédiatement", "expire", "suspendu"…) | 10 |
+| Credentials demand ("password", "code pin", "numéro de carte"…) | 15 |
+| Generic greeting ("cher client", "dear customer") | 5 |
+| HTTP link (not HTTPS) | 8 |
+| Punycode domain (xn--) | 20 |
+| IP-based link | 20 |
+| URL shortener (bit.ly, tinyurl…) | 12 |
+| Suspicious TLD (.xyz, .top, .tk, .ml, .ga, .cf, .gq, .zip, .mov) | 12 |
+| Excessive subdomains (4+ dots) | 8 |
+| Lookalike domain (paypa1.com → paypal) | 25 |
+| Dangerous attachment (.exe, .scr, .zip, .rar, .js, .vbs, .bat, .cmd, .iso, .docm, .xlsm) | 15 |
+
+`risk_level(score)` → `"AUCUN"` (0) / `"FAIBLE"` (1–29) / `"MOYEN"` (30–59) / `"ÉLEVÉ"` (60+).
+
+`--strict` exits with code 1 if score reaches MOYEN or higher.
+
+### Git pre-commit hook
+
+`scan-staged` + `install-hook` implement a pre-commit guard: the hook calls `scan-staged --strict` to block commits whose staged files contain secrets. The hook is written to `$(git rev-parse --git-dir)/hooks/pre-commit`. **Do not run `install-hook` from inside this repo's working tree** — it would install a pre-commit hook into `mon-code-ia/.git` and block your own commits; test it in a throwaway repo instead.
+
+### Tests
 
 ```bash
-python -m pytest dataguard/        # if pytest is installed
-cd dataguard && python test_dataguard.py   # zero-dependency fallback runner
+python -m pytest dataguard/                      # if pytest is installed
+cd dataguard && python test_dataguard.py         # zero-dependency fallback runner
 ```
 
-## Mobile app (`mobile/`)
+`test_dataguard.py` includes 22 tests: detector coverage (password, AWS key, Stripe key, Google API key, IBAN, email, valid/invalid credit card, clean text), redaction correctness, file scan, phishing scenarios (clean text, urgency+credentials, lookalike domain, IP link, legitimate domain not flagged), toolkit coverage (common-password rejection, strong password, empty password, password generation, hashing), and HTML report correctness. The fallback runner auto-discovers `test_*` functions and supports a `tmp_path` fixture via `tempfile.TemporaryDirectory`.
+
+## Mobile App (`mobile/`)
 
 `mobile/main.py` is a Kivy GUI exposing DataGuard's two text-based features (secret scan + phishing analysis) for touch use. It imports `detectors` and `phishing` by bare name; those files live in `dataguard/` and are **copied into `mobile/` at build time** by `.github/workflows/build-apk.yml` (they are git-ignored under `mobile/` to avoid drift — the single source of truth stays in `dataguard/`).
 
-- Build: the `Build APK DataGuard` GitHub Actions workflow (manual `workflow_dispatch`, or on push touching `mobile/`) runs Buildozer via `ArtemSBulgakov/buildozer-action@v1` and uploads the `.apk` as the `dataguard-apk` artifact. **APKs are built in CI, not locally** (Buildozer can't run on a phone, and a local build needs the Android SDK/NDK).
-- Config lives in `mobile/buildozer.spec` (`requirements = python3,kivy`).
+UI layout (`DataGuardLayout(BoxLayout)`):
+1. Title label — "🛡️ DataGuard"
+2. Instruction label
+3. Multi-line `TextInput` (paste area, 40% screen height)
+4. Two buttons side-by-side: "🔍 Scanner les secrets" (blue) and "🎣 Analyser phishing" (orange)
+5. `ScrollView` + result `Label` (height binds to `texture_size[1]`, auto-expands; uses Kivy markup for colour coding)
+
+`scan_text()` calls `detectors.scan_line()` per line and colour-codes results with Kivy markup (green = clean, red = HIGH, orange = MEDIUM, blue = LOW). `analyze_phishing()` calls `phishing.analyze()` and colour-codes by risk level.
+
+Build:
+- The `Build APK DataGuard` GitHub Actions workflow triggers on **manual `workflow_dispatch`** or **push to `main` touching `mobile/**` or the workflow file itself**.
+- Runner: `ubuntu-latest` with `ghcr.io/kivy/buildozer:latest` container (includes Android SDK/NDK).
+- Steps: checkout → git safe.directory → copy `detectors.py` + `phishing.py` into `mobile/` → `buildozer android debug` → upload `.apk` as `dataguard-apk` artifact.
+- **APKs are built in CI, not locally** (Buildozer requires the Android SDK/NDK).
+- Config lives in `mobile/buildozer.spec` (`requirements = python3,kivy`, targets API 34, minapi 24, both arm64-v8a and armeabi-v7a).
 - Local UI test: `pip install kivy`, copy the two modules in, then `python mobile/main.py`.
+
+## MonAppli (`monappli/`)
+
+`monappli/main.py` is a personal, full **cybersecurity toolbox** — a Kivy app
+that exposes everything DataGuard can do for touch use. It follows the same
+conventions as `mobile/` (imports the security modules by bare name; they are
+copied in at build time and git-ignored) but reuses **three** modules —
+`detectors`, `phishing`, and `toolkit` — instead of two, and is wider in scope.
+
+Six tools, laid out in a 2-column `GridLayout`, all operating on the single
+shared `TextInput`:
+
+| Button | Handler | Backed by |
+|---|---|---|
+| 🔍 Secrets | `scan_text()` | `detectors` |
+| 🎣 Phishing | `analyze_phishing()` | `phishing` |
+| ✅ Tout analyser | `analyze_all()` (concatenates both) | `detectors` + `phishing` |
+| 🔑 Force mot de passe | `check_password()` | `toolkit.password_strength` |
+| 🎲 Générer mot de passe | `make_password()` | `toolkit.generate_password` |
+| #️⃣ Empreintes (hash) | `hash_report()` | `toolkit.hash_text` |
+
+Conventions specific to `monappli/`:
+
+- Report colours live in module-level `SEVERITY_COLORS` / `RISK_COLORS` /
+  `PASSWORD_COLORS` dicts (not inline as in `mobile/main.py`).
+- `_esc()` escapes Kivy markup metacharacters (`[`, `]`, `&`) before any
+  user-supplied or generated string (e.g. generated passwords, redacted
+  excerpts) is rendered with `markup=True`. **Always escape dynamic text shown
+  in a markup Label** — generated passwords routinely contain `[`/`]`/`&`.
+
+Build/test mirrors `mobile/`: the `Build APK MonAppli` workflow triggers on
+`workflow_dispatch` or pushes to `main` touching `monappli/**` (or its workflow
+file), and copies `dataguard/{detectors,phishing,toolkit}.py` in. Local UI test:
+`pip install kivy`, copy the three modules in, then `python monappli/main.py`.
+
+When adding further reuse-of-DataGuard apps, follow this same template: a new
+folder, a `buildozer.spec` with a unique `package.name`, a matching workflow that
+copies the needed `dataguard/*.py` modules in, and matching `.gitignore` entries.
 
 ## Dependencies
 
 | Package | Required for |
 |---|---|
-| `anthropic>=0.40.0` | Claude API client — always required |
+| `anthropic>=0.40.0` | Claude API client — always required by jarvis/ |
 | `SpeechRecognition>=3.10.0` | Microphone → text (`--voice` only) |
 | `pyttsx3>=2.90` | Text → speech, offline (`--voice` only) |
 | `PyAudio>=0.2.14` | Audio I/O backend for SpeechRecognition (`--voice` only) |
+
+`dataguard/` has **zero external dependencies** (pure Python 3 stdlib: `re`, `pathlib`, `subprocess`, `argparse`, `json`, `dataclasses`, `html`, `datetime`, `stat`, plus `hashlib`, `secrets`, `math`, `string` for `toolkit.py`).
+
+## Key Architectural Decisions
+
+- **Modular separation**: the components are independent; only the Kivy apps (`mobile/`, `monappli/`) reuse `dataguard/`, via copy (not import), keeping `dataguard/` the single source of truth.
+- **Conditional voice loading**: jarvis imports audio libs only when `--voice` is present, avoiding dependency failures for text-only mode.
+- **Luhn validation**: credit card regex matches are verified by the Luhn checksum to suppress false positives.
+- **Redaction-first**: secrets are masked (`a***34`) before any display or logging; raw values never appear in output.
+- **CI-only APK builds**: Buildozer requires Android SDK/NDK; the GitHub Actions container provides both; local builds are not supported.
+- **No persistent state in jarvis**: `_history` lives only in memory for the process lifetime; there is no database or file backing.

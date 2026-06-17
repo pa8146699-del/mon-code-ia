@@ -6,8 +6,13 @@ venv/
 # Artéfacts de build Android (Buildozer)
 mobile/.buildozer/
 mobile/bin/
+monappli/.buildozer/
+monappli/bin/
 *.apk
 
 # Copies de la logique faites au build (jamais versionnées)
 mobile/detectors.py
 mobile/phishing.py
+monappli/detectors.py
+monappli/phishing.py
+monappli/toolkit.py
