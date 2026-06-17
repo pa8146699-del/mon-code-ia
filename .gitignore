@@ -3,6 +3,10 @@ __pycache__/
 .venv/
 venv/
 
+# Base de données locale d'AgentOS (source de vérité, jamais versionnée)
+agentos/agentos.db
+agentos/*.db
+
 # Artéfacts de build Android (Buildozer)
 mobile/.buildozer/
 mobile/bin/

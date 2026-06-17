@@ -4,14 +4,15 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-`mon-code-ia` is a personal Python toolkit with three components:
+`mon-code-ia` is a personal Python toolkit with these components:
 
-- `jarvis/` — a vocal/text assistant powered by the Claude API.
+- `jarvis/` — a vocal/text assistant powered by the Claude API (chat only).
+- `agentos/` — an "Agent OS": a Claude agent that uses **tool use** to read/write a central SQLite database (the single source of truth) across five domains, with optional Notion mirroring.
 - `dataguard/` — a command-line data-leak / phishing security toolkit (no external dependencies).
 - `mobile/` — a Kivy GUI wrapper around DataGuard, built into an Android APK by GitHub Actions.
 - `monappli/` — a second, personal Kivy security app reusing DataGuard, with its own combined "Tout analyser" action and its own APK build.
 
-`jarvis/` and `dataguard/` share no code. `mobile/` reuses `dataguard/detectors.py` and `dataguard/phishing.py`; `monappli/` reuses those two plus `dataguard/toolkit.py`. All three files are copied in at build time and never committed under those folders.
+`jarvis/`, `agentos/`, and `dataguard/` share no code with each other. `mobile/` reuses `dataguard/detectors.py` and `dataguard/phishing.py`; `monappli/` reuses those two plus `dataguard/toolkit.py`. All three files are copied in at build time and never committed under those folders.
 
 ## Repository Layout
 
@@ -26,6 +27,14 @@ mon-code-ia/
 ├── jarvis/
 │   ├── jarvis.py                     # Single-file assistant (~100 lines)
 │   └── requirements.txt
+├── agentos/
+│   ├── db.py                         # SQLite schema + CRUD (single source of truth)
+│   ├── tools.py                      # Claude tool-use definitions + dispatch()
+│   ├── agent.py                      # Jarvis-style agent loop with tool use
+│   ├── notion_sync.py                # Best-effort Notion mirror (stdlib urllib)
+│   ├── test_agentos.py               # Tests (db + dispatch, no API calls)
+│   ├── requirements.txt
+│   └── README.md
 ├── dataguard/
 │   ├── dataguard.py                  # Argparse dispatcher (cmd_* functions)
 │   ├── detectors.py                  # Secret-detection engine + Luhn + redact
@@ -70,6 +79,40 @@ python jarvis/jarvis.py --voice  # voice mode (microphone + speech synthesis)
 - **Language**: the system prompt instructs Claude to reply in French by default, switching to the user's language if they write in another one.
 - **Exit keywords**: `"quitter"`, `"stop"`, `"exit"`, `"quit"` (checked case-insensitively) terminate the loop.
 - `ANTHROPIC_API_KEY` is read via `os.environ["ANTHROPIC_API_KEY"]` — raises `KeyError` if unset.
+
+## AgentOS Architecture
+
+`agentos/` is an "Agent OS": unlike `jarvis/` (chat only), the agent uses
+Claude **tool use** to actually read and write a central database — the single
+source of truth — across five domains: **clients, projets, taches, finances,
+notes**. Run it like Jarvis:
+
+```bash
+pip install -r agentos/requirements.txt
+export ANTHROPIC_API_KEY=your-key
+python agentos/agent.py            # text mode
+python agentos/agent.py --voice    # voice mode (micro + speech)
+```
+
+Flat module layout (imported by bare name, `agentos/` is on `sys.path[0]` when run directly):
+
+- `db.py` — **SQLite, stdlib only** (`sqlite3`). The source of truth. Schema in `SCHEMA`; `connect(path)` creates the file + schema (path from `AGENTOS_DB` env, default `agentos/agentos.db`). Tables: `clients`, `projets`, `taches`, `finances`, `notes`. Every write function (`add_*`, `update_*`) returns the created/modified row as a JSON-serializable dict. `finance_summary()` returns revenus/dépenses/solde + dépenses par catégorie.
+- `tools.py` — `TOOLS` is the list of tool definitions sent to the Claude API. `dispatch(conn, name, args)` runs the requested tool against the DB via `_HANDLERS`, fires a best-effort Notion sync for write tools (`_SYNC_TABLE`), and returns a JSON string. **All tool errors are caught and returned as `{"erreur": ...}`** so a bad call surfaces to Claude instead of crashing the loop. Add a tool = a `db.py` function + a `TOOLS` entry + a `_HANDLERS` branch (+ `_SYNC_TABLE`/`_DB_ENV` for Notion).
+- `agent.py` — Jarvis-style loop, **same conventions as `jarvis/jarvis.py`** (module-level `VOICE_MODE`, conditional voice imports, `_history` global, model `claude-sonnet-4-6`, `max_tokens=1024`, French system prompt, same exit keywords). The difference: it passes `tools=TOOLS` and loops on `stop_reason == "tool_use"` — executing tools and feeding `tool_result` blocks back — until Claude produces a final text turn.
+- `notion_sync.py` — the **hybrid** layer. `sync_row(table, row)` mirrors a row to Notion via stdlib `urllib` (no SDK). **Best-effort and never raises**: a no-op returning `False` if `NOTION_TOKEN` or the per-table `NOTION_DB_*` env var is missing; network/API errors are caught and logged. The row's title field becomes the page title; full JSON goes in a code block in the page body (so no Notion schema constraints apply). SQLite stays the source of truth; Notion is just a mobile-readable mirror.
+
+Notion config (all optional env vars): `NOTION_TOKEN`, `NOTION_DB_{CLIENTS,PROJETS,TACHES,FINANCES,NOTES}`, `NOTION_TITLE_PROP` (default `"Name"`).
+
+### AgentOS tests
+
+```bash
+python -m pytest agentos/                 # if pytest is installed
+cd agentos && python test_agentos.py      # zero-dependency fallback runner
+```
+
+11 tests covering DB CRUD round-trips, status filtering, project/task linkage, `finance_summary`, note search, and tool `dispatch` (including unknown-tool and error-propagation paths). **No test calls the Claude API or Notion** — they exercise `db` and `tools.dispatch` directly against a `tmp_path` SQLite file. Same zero-dep runner pattern as `dataguard/test_dataguard.py` (`tmp_path` via `tempfile.TemporaryDirectory`).
+
+The local DB (`agentos/*.db`) is git-ignored.
 
 ## DataGuard
 
@@ -211,12 +254,12 @@ copies the needed `dataguard/*.py` modules in, and matching `.gitignore` entries
 
 | Package | Required for |
 |---|---|
-| `anthropic>=0.40.0` | Claude API client — always required by jarvis/ |
+| `anthropic>=0.40.0` | Claude API client — required by `jarvis/` and `agentos/` |
 | `SpeechRecognition>=3.10.0` | Microphone → text (`--voice` only) |
 | `pyttsx3>=2.90` | Text → speech, offline (`--voice` only) |
 | `PyAudio>=0.2.14` | Audio I/O backend for SpeechRecognition (`--voice` only) |
 
-`dataguard/` has **zero external dependencies** (pure Python 3 stdlib: `re`, `pathlib`, `subprocess`, `argparse`, `json`, `dataclasses`, `html`, `datetime`, `stat`, plus `hashlib`, `secrets`, `math`, `string` for `toolkit.py`).
+`agentos/` needs only `anthropic` (its `db.py` and `notion_sync.py` are stdlib-only: `sqlite3`, `urllib`). `dataguard/` has **zero external dependencies** (pure Python 3 stdlib: `re`, `pathlib`, `subprocess`, `argparse`, `json`, `dataclasses`, `html`, `datetime`, `stat`, plus `hashlib`, `secrets`, `math`, `string` for `toolkit.py`).
 
 ## Key Architectural Decisions
 
@@ -226,3 +269,5 @@ copies the needed `dataguard/*.py` modules in, and matching `.gitignore` entries
 - **Redaction-first**: secrets are masked (`a***34`) before any display or logging; raw values never appear in output.
 - **CI-only APK builds**: Buildozer requires Android SDK/NDK; the GitHub Actions container provides both; local builds are not supported.
 - **No persistent state in jarvis**: `_history` lives only in memory for the process lifetime; there is no database or file backing.
+- **AgentOS acts, it doesn't just chat**: where jarvis only converses, agentos gives Claude tools that mutate a SQLite DB — the "single source of truth". The UI is for humans to pilot; the AI uses the data to do real work (categorize an expense, fill a CRM card, track tasks).
+- **SQLite as source of truth, Notion as mirror**: the hybrid design keeps the authoritative data local in SQLite; Notion sync is optional, best-effort, and never blocks or crashes the agent if unconfigured or offline.
