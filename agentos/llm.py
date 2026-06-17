@@ -22,6 +22,12 @@ import os
 import urllib.error
 import urllib.request
 
+try:
+    import requests as _requests
+    _HAS_REQUESTS = True
+except ImportError:
+    _HAS_REQUESTS = False
+
 from tools import TOOLS, dispatch
 
 PROVIDER = os.environ.get("AGENTOS_PROVIDER", "groq").lower()
@@ -62,6 +68,10 @@ def _env_key() -> str | None:
 
 def _post(url: str, payload: dict, headers: dict) -> dict:
     headers = {"User-Agent": "AgentOS/1.0", **headers}
+    if _HAS_REQUESTS:
+        r = _requests.post(url, json=payload, headers=headers, timeout=60)
+        r.raise_for_status()
+        return r.json()
     request = urllib.request.Request(
         url, data=json.dumps(payload).encode("utf-8"), headers=headers, method="POST"
     )
