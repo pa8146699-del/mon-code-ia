@@ -3,10 +3,10 @@
 
 Trois moteurs au choix, via la variable d'environnement AGENTOS_PROVIDER :
 
-    gemini     (DÉFAUT) — GRATUIT. Clé gratuite sur https://aistudio.google.com
-               (sans carte bancaire). Modèles Google Gemini, function calling.
-    groq       GRATUIT. Clé gratuite sur https://console.groq.com. Modèles Llama,
-               API compatible OpenAI.
+    groq       (DÉFAUT) — GRATUIT, sans carte bancaire. Clé gratuite sur
+               https://console.groq.com. Modèles Llama, API compatible OpenAI.
+    gemini     GRATUIT. Clé gratuite sur https://aistudio.google.com.
+               Modèles Google Gemini, function calling.
     anthropic  Claude (Fable 5). Payant au token. Clé sur console.anthropic.com.
 
 Aucune dépendance externe : tout passe par urllib, donc l'APK se build avec
@@ -24,7 +24,7 @@ import urllib.request
 
 from tools import TOOLS, dispatch
 
-PROVIDER = os.environ.get("AGENTOS_PROVIDER", "gemini").lower()
+PROVIDER = os.environ.get("AGENTOS_PROVIDER", "groq").lower()
 
 # --- Configuration par moteur ----------------------------------------------
 

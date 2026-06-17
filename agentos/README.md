@@ -32,11 +32,11 @@ L'interface (toi) sert à **piloter** ; l'IA utilise les données pour **exécut
 
 ## Lancer
 
-Par défaut AgentOS utilise **Gemini** (gratuit). Récupère une clé gratuite sur
-https://aistudio.google.com (sans carte bancaire) :
+Par défaut AgentOS utilise **Groq** (gratuit, sans carte bancaire). Récupère une
+clé gratuite sur https://console.groq.com :
 
 ```bash
-export GEMINI_API_KEY=ta-clé-gemini    # moteur gratuit (défaut)
+export GROQ_API_KEY=ta-clé-groq        # moteur gratuit (défaut)
 
 python agentos/agent.py                # mode texte (aucun pip install requis)
 python agentos/agent.py --voice        # mode vocal (pip install -r agentos/requirements.txt)
@@ -45,11 +45,11 @@ python agentos/agent.py --voice        # mode vocal (pip install -r agentos/requ
 Trois moteurs au choix via `AGENTOS_PROVIDER` :
 
 ```bash
-# Gemini (défaut, gratuit) :
-export AGENTOS_PROVIDER=gemini   GEMINI_API_KEY=...     # GEMINI_MODEL=gemini-2.0-flash
-
-# Groq (gratuit) :
+# Groq (défaut, gratuit) :
 export AGENTOS_PROVIDER=groq     GROQ_API_KEY=...       # GROQ_MODEL=llama-3.3-70b-versatile
+
+# Gemini (gratuit) :
+export AGENTOS_PROVIDER=gemini   GEMINI_API_KEY=...     # GEMINI_MODEL=gemini-2.0-flash
 
 # Claude / Fable 5 (payant au token) :
 export AGENTOS_PROVIDER=anthropic ANTHROPIC_API_KEY=...

@@ -4,10 +4,10 @@ AgentOS sur ton **téléphone** : une app Kivy (Android) où Claude **agit** sur
 une base SQLite locale (clients, projets, tâches, finances, notes) — ta source
 unique de vérité, stockée sur l'appareil.
 
-**100 % gratuit** : par défaut le moteur est **Gemini** (clé gratuite sur
-https://aistudio.google.com, sans carte bancaire). Aucun service tiers payant
-(ni Notion, ni Make, ni Zapier). Tu saisis ta clé Gemini dans l'app. (Tu peux
-aussi basculer sur Groq — gratuit — ou Claude/Fable 5 — payant au token — via
+**100 % gratuit** : par défaut le moteur est **Groq** (clé gratuite sur
+https://console.groq.com, sans carte bancaire). Aucun service tiers payant
+(ni Notion, ni Make, ni Zapier). Tu saisis ta clé Groq dans l'app. (Tu peux
+aussi basculer sur Gemini — gratuit — ou Claude/Fable 5 — payant au token — via
 `AGENTOS_PROVIDER`, voir `agentos/llm.py`.)
 
 ## Comment ça marche
@@ -40,7 +40,7 @@ Télécharge-le et installe-le sur ton téléphone.
 pip install kivy
 cd agentmobile
 cp ../agentos/db.py ../agentos/tools.py ../agentos/notion_sync.py ../agentos/llm.py .
-export GEMINI_API_KEY=ta-clé-gemini   # pré-remplit le champ (optionnel)
+export GROQ_API_KEY=ta-clé-groq   # pré-remplit le champ (optionnel)
 python main.py
 ```
 

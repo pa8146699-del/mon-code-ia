@@ -7,7 +7,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 `mon-code-ia` is a personal Python toolkit with these components:
 
 - `jarvis/` — a vocal/text assistant powered by the Claude API (chat only).
-- `agentos/` — an "Agent OS": an LLM agent that uses **tool use** to read/write a central SQLite database (the single source of truth) across five domains, with optional Notion mirroring. Stdlib-only (the API call goes through `urllib`, not an SDK); multi-provider — **free default (Gemini)**, plus Groq (free) and Claude (paid).
+- `agentos/` — an "Agent OS": an LLM agent that uses **tool use** to read/write a central SQLite database (the single source of truth) across five domains, with optional Notion mirroring. Stdlib-only (the API call goes through `urllib`, not an SDK); multi-provider — **free default (Groq)**, plus Gemini (free) and Claude (paid).
 - `agentmobile/` — a Kivy GUI (Android) front-end for AgentOS: a chat that drives the agent against a local SQLite DB on the phone. Reuses `agentos/`'s modules; its own APK build.
 - `dataguard/` — a command-line data-leak / phishing security toolkit (no external dependencies).
 - `mobile/` — a Kivy GUI wrapper around DataGuard, built into an Android APK by GitHub Actions.
@@ -100,8 +100,8 @@ notes**. Run it like Jarvis:
 ```bash
 # Text mode needs NO pip install (pure stdlib). --voice needs the voice deps:
 pip install -r agentos/requirements.txt   # only for --voice
-export GEMINI_API_KEY=your-free-gemini-key  # default provider (free). Others:
-# AGENTOS_PROVIDER=groq + GROQ_API_KEY  (free)  |  AGENTOS_PROVIDER=anthropic + ANTHROPIC_API_KEY (paid)
+export GROQ_API_KEY=your-free-groq-key      # default provider (free). Others:
+# AGENTOS_PROVIDER=gemini + GEMINI_API_KEY (free)  |  AGENTOS_PROVIDER=anthropic + ANTHROPIC_API_KEY (paid)
 python agentos/agent.py            # text mode
 python agentos/agent.py --voice    # voice mode (micro + speech)
 ```
@@ -110,9 +110,9 @@ Flat module layout (imported by bare name, `agentos/` is on `sys.path[0]` when r
 
 - `db.py` — **SQLite, stdlib only** (`sqlite3`). The source of truth. Schema in `SCHEMA`; `connect(path)` creates the file + schema (path from `AGENTOS_DB` env, default `agentos/agentos.db`). Tables: `clients`, `projets`, `taches`, `finances`, `notes`. Every write function (`add_*`, `update_*`) returns the created/modified row as a JSON-serializable dict. `finance_summary()` returns revenus/dépenses/solde + dépenses par catégorie.
 - `tools.py` — `TOOLS` is the list of tool definitions sent to the Claude API. `dispatch(conn, name, args)` runs the requested tool against the DB via `_HANDLERS`, fires a best-effort Notion sync for write tools (`_SYNC_TABLE`), and returns a JSON string. **All tool errors are caught and returned as `{"erreur": ...}`** so a bad call surfaces to Claude instead of crashing the loop. Add a tool = a `db.py` function + a `TOOLS` entry + a `_HANDLERS` branch (+ `_SYNC_TABLE`/`_DB_ENV` for Notion).
-- `llm.py` — **the shared agent loop, stdlib only** (urllib, no SDK — keeps the APK light and the package dependency-free). **Multi-provider**, selected by `AGENTOS_PROVIDER` (`_RUNNERS` dict), default `"gemini"`:
-  - `_run_gemini` — Google Gemini `generateContent` (default, free). `_gemini_tools()` maps `TOOLS` to `function_declarations` (omitting `parameters` when properties are empty — Gemini rejects empty param objects). Roles are only `user`/`model`; model `functionCall` parts are answered with a `user` turn of `functionResponse` parts (response coerced to an object). Model from `GEMINI_MODEL` (default `gemini-2.0-flash`); key header `x-goog-api-key`.
-  - `_run_openai` — Groq (OpenAI-compatible chat-completions + tool calling, free). `_openai_tools()` converts `TOOLS` to `{"type":"function","function":{…}}`; loops while `message.tool_calls` is present; tool results are `{"role":"tool","tool_call_id",…}`. Model from `GROQ_MODEL` (default `llama-3.3-70b-versatile`).
+- `llm.py` — **the shared agent loop, stdlib only** (urllib, no SDK — keeps the APK light and the package dependency-free). **Multi-provider**, selected by `AGENTOS_PROVIDER` (`_RUNNERS` dict), default `"groq"`:
+  - `_run_gemini` — Google Gemini `generateContent` (free). `_gemini_tools()` maps `TOOLS` to `function_declarations` (omitting `parameters` when properties are empty — Gemini rejects empty param objects). Roles are only `user`/`model`; model `functionCall` parts are answered with a `user` turn of `functionResponse` parts (response coerced to an object). Model from `GEMINI_MODEL` (default `gemini-2.0-flash`); key header `x-goog-api-key`.
+  - `_run_openai` — Groq (OpenAI-compatible chat-completions + tool calling, **default**, free). `_openai_tools()` converts `TOOLS` to `{"type":"function","function":{…}}`; loops while `message.tool_calls` is present; tool results are `{"role":"tool","tool_call_id",…}`. Model from `GROQ_MODEL` (default `llama-3.3-70b-versatile`).
   - `_run_anthropic` — Claude Messages API (paid). Loops on `stop_reason == "tool_use"`, feeds `tool_result` blocks back. Model `claude-fable-5`.
   - **The message `history` format is provider-specific** (Gemini uses `parts`; the others use `content`) — keep one provider per session/history. `run_turn(conn, history, user_message, api_key=None, on_tool=None)` appends the provider-appropriate user turn, picks the runner, mutates `history` in place, returns the final text. API/network errors are returned as a string, not raised. Key comes from `api_key` or the per-provider env var (`_KEY_VAR`: `GEMINI_API_KEY` / `GROQ_API_KEY` / `ANTHROPIC_API_KEY`). **Both `agent.py` and `agentmobile/` call this** — the one place the agent logic lives.
 - `agent.py` — thin terminal/voice front-end, **same conventions as `jarvis/jarvis.py`** (module-level `VOICE_MODE`, conditional voice imports, `_history` global, same exit keywords). It delegates the actual turn to `llm.run_turn`, passing an `on_tool` callback that prints each tool call.
@@ -276,8 +276,8 @@ time, git-ignored): `agentos/{db,tools,notion_sync,llm}.py`.
 
 Key points specific to `agentmobile/`:
 
-- **Fully free by default** — the default provider is **Gemini** (free key, no card);
-  Groq is also free. No paid third-party service. The key field's hint/env-var adapt
+- **Fully free by default** — the default provider is **Groq** (free key, no card);
+  Gemini is also free. No paid third-party service. The key field's hint/env-var adapt
   to `llm.PROVIDER` (`GEMINI_API_KEY` / `GROQ_API_KEY` / `ANTHROPIC_API_KEY`);
   pre-filled from env for desktop tests.
 - **Calls the model via `llm.run_turn`** (urllib, no SDK), so `requirements` stays
@@ -313,7 +313,7 @@ stdlib: `re`, `pathlib`, `subprocess`, `argparse`, `json`, `dataclasses`, `html`
 ## Key Architectural Decisions
 
 - **Modular separation + reuse-via-copy**: components are independent; the Kivy apps reuse a core folder by copying its modules at build time (not importing), keeping the core the single source of truth — `mobile/`+`monappli/` from `dataguard/`, `agentmobile/` from `agentos/`.
-- **SDK-free, multi-provider agent**: `agentos/llm.py` talks to the LLM HTTP APIs via `urllib` instead of any SDK. This keeps the package stdlib-only and lets `agentmobile/` build an APK with just `python3,kivy`. It supports **free Gemini (default) and Groq**, plus an optional paid Claude path, switched by `AGENTOS_PROVIDER`. `jarvis/` still uses the `anthropic` SDK.
+- **SDK-free, multi-provider agent**: `agentos/llm.py` talks to the LLM HTTP APIs via `urllib` instead of any SDK. This keeps the package stdlib-only and lets `agentmobile/` build an APK with just `python3,kivy`. It supports **free Groq (default) and Gemini**, plus an optional paid Claude path, switched by `AGENTOS_PROVIDER`. `jarvis/` still uses the `anthropic` SDK.
 - **Conditional voice loading**: jarvis imports audio libs only when `--voice` is present, avoiding dependency failures for text-only mode.
 - **Luhn validation**: credit card regex matches are verified by the Luhn checksum to suppress false positives.
 - **Redaction-first**: secrets are masked (`a***34`) before any display or logging; raw values never appear in output.
