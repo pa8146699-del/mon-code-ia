@@ -8,17 +8,15 @@
     python agentos/agent.py            # mode texte (terminal)
     python agentos/agent.py --voice    # mode vocal (micro + synthèse)
 
-Nécessite ANTHROPIC_API_KEY. La synchro Notion (optionnelle) s'active via les
-variables NOTION_* (voir notion_sync.py).
+Nécessite ANTHROPIC_API_KEY. Zéro dépendance externe en mode texte (l'appel
+API passe par urllib via llm.py). La synchro Notion (optionnelle) s'active via
+les variables NOTION_* (voir notion_sync.py).
 """
 
-import os
 import sys
 
-import anthropic
-
 import db
-from tools import TOOLS, dispatch
+import llm
 
 VOICE_MODE = "--voice" in sys.argv
 
@@ -29,20 +27,8 @@ if VOICE_MODE:
     _recognizer = sr.Recognizer()
     _engine = pyttsx3.init()
 
-_client = anthropic.Anthropic(api_key=os.environ["ANTHROPIC_API_KEY"])
 _conn = db.connect()
 _history: list[dict] = []
-
-SYSTEM = (
-    "Tu es AgentOS, un assistant personnel qui gère un système centralisé "
-    "(clients, projets, tâches, finances, notes) servant de source unique de "
-    "vérité. Tu ne te contentes pas de discuter : tu utilises les outils mis à "
-    "ta disposition pour LIRE et ÉCRIRE concrètement dans la base. Quand "
-    "l'utilisateur te donne une information (une dépense, un prospect, une "
-    "tâche…), enregistre-la avec le bon outil, puis confirme brièvement. "
-    "Quand il pose une question, interroge la base avant de répondre. "
-    "Réponds en français, de façon concise."
-)
 
 
 def listen() -> str:
@@ -76,39 +62,8 @@ def speak(text: str) -> None:
     _engine.runAndWait()
 
 
-def respond(user_message: str) -> str:
-    """Boucle d'agent : Claude raisonne, appelle des outils, puis conclut."""
-    _history.append({"role": "user", "content": user_message})
-
-    while True:
-        response = _client.messages.create(
-            model="claude-sonnet-4-6",
-            max_tokens=1024,
-            system=SYSTEM,
-            tools=TOOLS,
-            messages=_history,
-        )
-        _history.append({"role": "assistant", "content": response.content})
-
-        if response.stop_reason != "tool_use":
-            # Réponse finale : concatène les blocs texte.
-            return "".join(b.text for b in response.content if b.type == "text")
-
-        # Exécute chaque outil demandé et renvoie les résultats à Claude.
-        tool_results = []
-        for block in response.content:
-            if block.type != "tool_use":
-                continue
-            print(f"  [outil] {block.name}({block.input})")
-            output = dispatch(_conn, block.name, block.input)
-            tool_results.append(
-                {
-                    "type": "tool_result",
-                    "tool_use_id": block.id,
-                    "content": output,
-                }
-            )
-        _history.append({"role": "user", "content": tool_results})
+def _log_tool(name: str, args: dict) -> None:
+    print(f"  [outil] {name}({args})")
 
 
 def main() -> None:
@@ -129,7 +84,7 @@ def main() -> None:
                 speak(farewell)
             break
 
-        reply = respond(user_input)
+        reply = llm.run_turn(_conn, _history, user_input, on_tool=_log_tool)
         print(f"AgentOS : {reply}\n")
 
         if VOICE_MODE:

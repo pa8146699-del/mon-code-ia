@@ -1,0 +1,45 @@
+name: Build APK AgentMobile
+
+# Construit ton application Android AgentOS (AgentMobile) dans le cloud.
+# Déclenche-le manuellement depuis l'onglet "Actions" de GitHub
+# (bouton "Run workflow"), puis télécharge l'APK dans les artéfacts.
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+    paths:
+      - "agentmobile/**"
+      - ".github/workflows/build-agentmobile.yml"
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    # Image officielle Kivy : Java + dépendances Buildozer déjà installés.
+    container:
+      image: ghcr.io/kivy/buildozer:latest
+      options: --user root
+    env:
+      # Autorise Buildozer à tourner en root dans le conteneur CI.
+      BUILDOZER_WARN_ON_ROOT: "0"
+    steps:
+      - name: Récupérer le code
+        uses: actions/checkout@v4
+
+      - name: Marquer le dossier comme sûr pour git
+        run: git config --global --add safe.directory "$GITHUB_WORKSPACE"
+
+      - name: Copier la logique AgentOS dans agentmobile/
+        run: cp agentos/db.py agentos/tools.py agentos/notion_sync.py agentos/llm.py agentmobile/
+
+      - name: Construire l'APK avec Buildozer
+        working-directory: agentmobile
+        run: buildozer android debug
+
+      - name: Publier l'APK en artéfact
+        uses: actions/upload-artifact@v4
+        with:
+          name: agentmobile-apk
+          path: agentmobile/bin/*.apk
+          if-no-files-found: error

@@ -12,6 +12,8 @@ mobile/.buildozer/
 mobile/bin/
 monappli/.buildozer/
 monappli/bin/
+agentmobile/.buildozer/
+agentmobile/bin/
 *.apk
 
 # Copies de la logique faites au build (jamais versionnées)
@@ -20,3 +22,8 @@ mobile/phishing.py
 monappli/detectors.py
 monappli/phishing.py
 monappli/toolkit.py
+agentmobile/db.py
+agentmobile/tools.py
+agentmobile/notion_sync.py
+agentmobile/llm.py
+agentmobile/*.db
