@@ -27,3 +27,8 @@ agentmobile/tools.py
 agentmobile/notion_sync.py
 agentmobile/llm.py
 agentmobile/*.db
+
+# Données locales de l'app Épargne (SQLite, créé au premier lancement)
+savings/savings.db
+savings/.buildozer/
+savings/bin/
