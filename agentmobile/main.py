@@ -51,8 +51,10 @@ class AgentLayout(BoxLayout):
             size_hint_y=None, height=44, font_size="22sp",
         ))
 
-        # Le moteur (Groq gratuit par défaut, ou Claude) est choisi dans llm.py.
-        if llm.PROVIDER == "groq":
+        # Le moteur (Gemini gratuit par défaut, ou Groq/Claude) est choisi dans llm.py.
+        if llm.PROVIDER == "gemini":
+            hint, env_var = "Clé API Gemini (gratuite — aistudio.google.com)…", "GEMINI_API_KEY"
+        elif llm.PROVIDER == "groq":
             hint, env_var = "Clé API Groq (gratuite — console.groq.com)…", "GROQ_API_KEY"
         else:
             hint, env_var = "Clé API Claude (ANTHROPIC_API_KEY)…", "ANTHROPIC_API_KEY"

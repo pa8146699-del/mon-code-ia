@@ -32,26 +32,28 @@ L'interface (toi) sert à **piloter** ; l'IA utilise les données pour **exécut
 
 ## Lancer
 
-Par défaut AgentOS utilise **Groq** (gratuit). Récupère une clé gratuite sur
-https://console.groq.com (sans carte bancaire) :
+Par défaut AgentOS utilise **Gemini** (gratuit). Récupère une clé gratuite sur
+https://aistudio.google.com (sans carte bancaire) :
 
 ```bash
-export GROQ_API_KEY=ta-clé-groq        # moteur gratuit (défaut)
+export GEMINI_API_KEY=ta-clé-gemini    # moteur gratuit (défaut)
 
 python agentos/agent.py                # mode texte (aucun pip install requis)
 python agentos/agent.py --voice        # mode vocal (pip install -r agentos/requirements.txt)
 ```
 
-Pour utiliser Claude (Fable 5) à la place (payant au token) :
+Trois moteurs au choix via `AGENTOS_PROVIDER` :
 
 ```bash
-export AGENTOS_PROVIDER=anthropic
-export ANTHROPIC_API_KEY=ta-clé-claude
-python agentos/agent.py
-```
+# Gemini (défaut, gratuit) :
+export AGENTOS_PROVIDER=gemini   GEMINI_API_KEY=...     # GEMINI_MODEL=gemini-2.0-flash
 
-Le moteur est piloté par `AGENTOS_PROVIDER` (`groq` par défaut, ou `anthropic`).
-Tu peux changer le modèle Groq via `GROQ_MODEL` (défaut : `llama-3.3-70b-versatile`).
+# Groq (gratuit) :
+export AGENTOS_PROVIDER=groq     GROQ_API_KEY=...       # GROQ_MODEL=llama-3.3-70b-versatile
+
+# Claude / Fable 5 (payant au token) :
+export AGENTOS_PROVIDER=anthropic ANTHROPIC_API_KEY=...
+```
 
 Exemples de phrases :
 
@@ -67,7 +69,7 @@ Exemples de phrases :
 |---|---|
 | `db.py` | Schéma + CRUD SQLite (5 domaines). Zéro dépendance. La source de vérité. |
 | `tools.py` | Définitions d'outils + `dispatch()` (exécute + synchro Notion). |
-| `llm.py` | Boucle d'agent + appel API (Groq gratuit ou Claude), via urllib. |
+| `llm.py` | Boucle d'agent + appel API (Gemini/Groq gratuits, ou Claude), via urllib. |
 | `agent.py` | Front-end terminal/voix style Jarvis (texte / `--voice`). |
 | `notion_sync.py` | Synchro best-effort vers Notion (stdlib `urllib`). |
 | `test_agentos.py` | Tests (base + dispatch), sans appel API. |

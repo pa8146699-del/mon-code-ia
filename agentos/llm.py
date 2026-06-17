@@ -1,18 +1,20 @@
 #!/usr/bin/env python3
 """Client API + boucle d'agent — stdlib pure (urllib, zéro SDK).
 
-Deux moteurs au choix, via la variable d'environnement AGENTOS_PROVIDER :
+Trois moteurs au choix, via la variable d'environnement AGENTOS_PROVIDER :
 
-    groq       (DÉFAUT) — GRATUIT. Clé gratuite sur https://console.groq.com
-               (sans carte bancaire). Modèle Llama, API compatible OpenAI.
-    anthropic  — Claude (Fable 5). Payant au token. Clé sur console.anthropic.com.
+    gemini     (DÉFAUT) — GRATUIT. Clé gratuite sur https://aistudio.google.com
+               (sans carte bancaire). Modèles Google Gemini, function calling.
+    groq       GRATUIT. Clé gratuite sur https://console.groq.com. Modèles Llama,
+               API compatible OpenAI.
+    anthropic  Claude (Fable 5). Payant au token. Clé sur console.anthropic.com.
 
 Aucune dépendance externe : tout passe par urllib, donc l'APK se build avec
 `python3,kivy` seulement. Code partagé entre agent.py (terminal/voix) et
 agentmobile/ (Kivy).
 
 Clé : fournie via l'argument api_key, sinon lue dans l'environnement
-(GROQ_API_KEY pour groq, ANTHROPIC_API_KEY pour anthropic).
+(GEMINI_API_KEY / GROQ_API_KEY / ANTHROPIC_API_KEY selon le moteur).
 """
 
 import json
@@ -22,9 +24,12 @@ import urllib.request
 
 from tools import TOOLS, dispatch
 
-PROVIDER = os.environ.get("AGENTOS_PROVIDER", "groq").lower()
+PROVIDER = os.environ.get("AGENTOS_PROVIDER", "gemini").lower()
 
 # --- Configuration par moteur ----------------------------------------------
+
+_GEMINI_MODEL = os.environ.get("GEMINI_MODEL", "gemini-2.0-flash")
+_GEMINI_API = "https://generativelanguage.googleapis.com/v1beta/models"
 
 _GROQ_API = "https://api.groq.com/openai/v1/chat/completions"
 _GROQ_MODEL = os.environ.get("GROQ_MODEL", "llama-3.3-70b-versatile")
@@ -32,6 +37,12 @@ _GROQ_MODEL = os.environ.get("GROQ_MODEL", "llama-3.3-70b-versatile")
 _ANTHROPIC_API = "https://api.anthropic.com/v1/messages"
 _ANTHROPIC_MODEL = "claude-fable-5"
 _ANTHROPIC_VERSION = "2023-06-01"
+
+_KEY_VAR = {
+    "gemini": "GEMINI_API_KEY",
+    "groq": "GROQ_API_KEY",
+    "anthropic": "ANTHROPIC_API_KEY",
+}
 
 SYSTEM = (
     "Tu es AgentOS, un assistant personnel qui gère un système centralisé "
@@ -46,7 +57,7 @@ SYSTEM = (
 
 
 def _env_key() -> str | None:
-    return os.environ.get("GROQ_API_KEY" if PROVIDER == "groq" else "ANTHROPIC_API_KEY")
+    return os.environ.get(_KEY_VAR.get(PROVIDER, ""))
 
 
 def _post(url: str, payload: dict, headers: dict) -> dict:
@@ -55,6 +66,58 @@ def _post(url: str, payload: dict, headers: dict) -> dict:
     )
     with urllib.request.urlopen(request, timeout=60) as resp:
         return json.loads(resp.read().decode("utf-8"))
+
+
+# --- Moteur Gemini (Google) ------------------------------------------------
+
+def _gemini_tools() -> list[dict]:
+    """Convertit TOOLS vers les function_declarations de Gemini."""
+    decls = []
+    for t in TOOLS:
+        decl = {"name": t["name"], "description": t["description"]}
+        params = t.get("input_schema", {})
+        if params.get("properties"):  # Gemini refuse un objet de params vide
+            decl["parameters"] = params
+        decls.append(decl)
+    return [{"function_declarations": decls}]
+
+
+def _run_gemini(conn, history, key, on_tool) -> str:
+    url = f"{_GEMINI_API}/{_GEMINI_MODEL}:generateContent"
+    headers = {"Content-Type": "application/json", "x-goog-api-key": key}
+    while True:
+        payload = {
+            "systemInstruction": {"parts": [{"text": SYSTEM}]},
+            "contents": history,
+            "tools": _gemini_tools(),
+        }
+        data = _post(url, payload, headers)
+        candidates = data.get("candidates")
+        if not candidates:
+            return f"Réponse vide du modèle : {json.dumps(data, ensure_ascii=False)[:300]}"
+
+        parts = candidates[0].get("content", {}).get("parts", [])
+        history.append({"role": "model", "parts": parts})
+
+        calls = [p["functionCall"] for p in parts if "functionCall" in p]
+        if not calls:
+            return "".join(p.get("text", "") for p in parts if "text" in p)
+
+        responses = []
+        for fc in calls:
+            name = fc["name"]
+            args = fc.get("args") or {}
+            if on_tool:
+                on_tool(name, args)
+            output = dispatch(conn, name, args)
+            try:
+                parsed = json.loads(output)
+            except json.JSONDecodeError:
+                parsed = output
+            if not isinstance(parsed, dict):
+                parsed = {"result": parsed}
+            responses.append({"functionResponse": {"name": name, "response": parsed}})
+        history.append({"role": "user", "parts": responses})
 
 
 # --- Moteur Groq / compatible OpenAI ---------------------------------------
@@ -139,6 +202,9 @@ def _run_anthropic(conn, history, key, on_tool) -> str:
         history.append({"role": "user", "content": tool_results})
 
 
+_RUNNERS = {"gemini": _run_gemini, "groq": _run_openai, "anthropic": _run_anthropic}
+
+
 # --- Point d'entrée ---------------------------------------------------------
 
 def run_turn(conn, history: list[dict], user_message: str,
@@ -151,13 +217,16 @@ def run_turn(conn, history: list[dict], user_message: str,
     """
     key = api_key or _env_key()
     if not key:
-        var = "GROQ_API_KEY" if PROVIDER == "groq" else "ANTHROPIC_API_KEY"
-        raise RuntimeError(f"Clé API manquante ({var} ou argument api_key).")
+        raise RuntimeError(
+            f"Clé API manquante ({_KEY_VAR.get(PROVIDER, '?')} ou argument api_key)."
+        )
 
-    # En format OpenAI le message user est une chaîne ; en Anthropic aussi.
-    history.append({"role": "user", "content": user_message})
+    if PROVIDER == "gemini":
+        history.append({"role": "user", "parts": [{"text": user_message}]})
+    else:
+        history.append({"role": "user", "content": user_message})
 
-    runner = _run_openai if PROVIDER == "groq" else _run_anthropic
+    runner = _RUNNERS.get(PROVIDER, _run_gemini)
     try:
         return runner(conn, history, key, on_tool)
     except urllib.error.HTTPError as e:
