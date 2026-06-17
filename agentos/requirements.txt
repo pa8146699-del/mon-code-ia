@@ -1,0 +1,7 @@
+# AgentOS n'a AUCUNE dépendance externe en mode texte : l'appel à l'API Claude
+# passe par urllib (stdlib) dans llm.py, et la base est SQLite (stdlib).
+# Seul le mode --voice nécessite ces paquets optionnels :
+
+SpeechRecognition>=3.10.0
+pyttsx3>=2.90
+PyAudio>=0.2.14
