@@ -1,17 +1,17 @@
 #!/usr/bin/env python3
 """AgentMobile — AgentOS sur ton téléphone (interface tactile Kivy).
 
-Un chat où Claude AGIT sur une base SQLite locale (clients, projets, tâches,
+Un chat où l'agent AGIT sur une base SQLite locale (clients, projets, tâches,
 finances, notes) — ta source unique de vérité, stockée sur l'appareil.
 
 Réutilise la logique du dossier agentos/ :
     db.py, tools.py, notion_sync.py, llm.py
 Ces modules sont copiés à côté de ce fichier au moment du build
-(voir .github/workflows/build-agentmobile.yml). L'appel à l'API Claude passe
+(voir .github/workflows/build-agentmobile.yml). L'appel à l'API passe
 par urllib (llm.py) : aucune dépendance lourde, l'APK ne requiert que kivy.
 
-Tout est gratuit hormis l'usage de l'API Claude (au token, pas d'abonnement) :
-saisis ta clé ANTHROPIC dans le champ prévu.
+100 % gratuit par défaut : le moteur est Groq (clé gratuite sur console.groq.com).
+Saisis ta clé Groq dans le champ prévu.
 
 Pour tester l'interface sur ordinateur :
     pip install kivy
@@ -47,17 +47,23 @@ class AgentLayout(BoxLayout):
         self.busy = False
 
         self.add_widget(Label(
-            text="[b]🤖 AgentOS[/b]", markup=True,
+            text="[b]AgentOS[/b]", markup=True,
             size_hint_y=None, height=44, font_size="22sp",
         ))
 
+        # Le moteur (Groq gratuit par défaut, ou Gemini/Claude) est choisi dans llm.py.
+        if llm.PROVIDER == "gemini":
+            hint, env_var = "Clé API Gemini (gratuite — aistudio.google.com)…", "GEMINI_API_KEY"
+        elif llm.PROVIDER == "groq":
+            hint, env_var = "Clé API Groq (gratuite — console.groq.com)…", "GROQ_API_KEY"
+        else:
+            hint, env_var = "Clé API Claude (ANTHROPIC_API_KEY)…", "ANTHROPIC_API_KEY"
         self.key_input = TextInput(
-            hint_text="Clé API Claude (ANTHROPIC_API_KEY)…",
-            password=True, multiline=False,
+            hint_text=hint, password=True, multiline=False,
             size_hint_y=None, height=44,
         )
         # Pré-remplie si la variable d'environnement existe (test PC).
-        self.key_input.text = os.environ.get("ANTHROPIC_API_KEY", "")
+        self.key_input.text = os.environ.get(env_var, "")
         self.add_widget(self.key_input)
 
         scroll = ScrollView()
@@ -94,7 +100,8 @@ class AgentLayout(BoxLayout):
             return
         key = self.key_input.text.strip()
         if not key:
-            self._append("[color=e74c3c]⚠ Saisis d'abord ta clé API Claude.[/color]")
+            provider_name = {"groq": "Groq", "gemini": "Gemini"}.get(llm.PROVIDER, "Claude")
+            self._append(f"[color=e74c3c]Saisis d'abord ta cle API {provider_name}.[/color]")
             return
 
         self.message_input.text = ""
