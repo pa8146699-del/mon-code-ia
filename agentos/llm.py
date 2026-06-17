@@ -61,6 +61,7 @@ def _env_key() -> str | None:
 
 
 def _post(url: str, payload: dict, headers: dict) -> dict:
+    headers = {"User-Agent": "AgentOS/1.0", **headers}
     request = urllib.request.Request(
         url, data=json.dumps(payload).encode("utf-8"), headers=headers, method="POST"
     )
