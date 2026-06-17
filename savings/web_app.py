@@ -179,11 +179,14 @@ def render_dashboard(conn):
     for row in rows:
         color = VEHICLE_COLORS[row["color_idx"] % len(VEHICLE_COLORS)]
         pct_v = row["current_total"] / GOAL * 100
+        name_h = row["name"]
+        total_h = fmt_money(row["current_total"])
+        monthly_h = fmt_money(row["monthly_amount"])
         vehicles_html += f"""
         <div class="vehicle" style="border-color:{color}">
-          <div style="color:{color};font-weight:bold;font-size:15px">{row['name']}</div>
-          <div class="amount" style="color:{color}">{fmt_money(row['current_total'])}</div>
-          <div class="small">{pct_v:.3f}% de l'objectif &nbsp;|&nbsp; {fmt_money(row['monthly_amount'])} / mois</div>
+          <div style="color:{color};font-weight:bold;font-size:15px">{name_h}</div>
+          <div class="amount" style="color:{color}">{total_h}</div>
+          <div class="small">{pct_v:.3f}% de l'objectif &nbsp;|&nbsp; {monthly_h} / mois</div>
         </div>"""
 
     projections = ""
@@ -225,20 +228,24 @@ def render_comptes(conn, msg=""):
     vehicles_html = ""
     for row in rows:
         color = VEHICLE_COLORS[row["color_idx"] % len(VEHICLE_COLORS)]
+        vid       = row["id"]
+        name_h    = row["name"]
+        total_v   = row["current_total"]
+        monthly_v = row["monthly_amount"]
         vehicles_html += f"""
         <div class="card" style="border-left:4px solid {color}">
-          <h2 style="color:{color}">{row['name']}</h2>
+          <h2 style="color:{color}">{name_h}</h2>
           <form method="POST" action="/comptes/update">
-            <input type="hidden" name="id" value="{row['id']}">
+            <input type="hidden" name="id" value="{vid}">
             <label class="small">Total épargné (€)</label>
-            <input type="number" name="total" value="{row['current_total']:.2f}" step="0.01" min="0">
+            <input type="number" name="total" value="{total_v:.2f}" step="0.01" min="0">
             <label class="small">Versement mensuel (€)</label>
-            <input type="number" name="monthly" value="{row['monthly_amount']:.2f}" step="0.01" min="0">
+            <input type="number" name="monthly" value="{monthly_v:.2f}" step="0.01" min="0">
             <button class="btn btn-primary" type="submit">💾 Sauvegarder</button>
           </form>
           <form method="POST" action="/comptes/delete" style="margin-top:8px"
-                onsubmit="return confirm('Supprimer {row[\'name\']} ?')">
-            <input type="hidden" name="id" value="{row['id']}">
+                onsubmit="return confirm('Supprimer ce compte ?')">
+            <input type="hidden" name="id" value="{vid}">
             <button class="btn btn-danger" type="submit">🗑 Supprimer</button>
           </form>
         </div>"""
