@@ -7,7 +7,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 `mon-code-ia` is a personal Python toolkit with these components:
 
 - `jarvis/` — a vocal/text assistant powered by the Claude API (chat only).
-- `agentos/` — an "Agent OS": a Claude agent that uses **tool use** to read/write a central SQLite database (the single source of truth) across five domains, with optional Notion mirroring. Stdlib-only (the Claude API call goes through `urllib`, not the SDK).
+- `agentos/` — an "Agent OS": an LLM agent that uses **tool use** to read/write a central SQLite database (the single source of truth) across five domains, with optional Notion mirroring. Stdlib-only (the API call goes through `urllib`, not an SDK); multi-provider with a **free default (Groq)** and an optional paid Claude path.
 - `agentmobile/` — a Kivy GUI (Android) front-end for AgentOS: a chat that drives the agent against a local SQLite DB on the phone. Reuses `agentos/`'s modules; its own APK build.
 - `dataguard/` — a command-line data-leak / phishing security toolkit (no external dependencies).
 - `mobile/` — a Kivy GUI wrapper around DataGuard, built into an Android APK by GitHub Actions.
@@ -100,7 +100,8 @@ notes**. Run it like Jarvis:
 ```bash
 # Text mode needs NO pip install (pure stdlib). --voice needs the voice deps:
 pip install -r agentos/requirements.txt   # only for --voice
-export ANTHROPIC_API_KEY=your-key
+export GROQ_API_KEY=your-free-groq-key     # default provider (free); or set
+                                           # AGENTOS_PROVIDER=anthropic + ANTHROPIC_API_KEY
 python agentos/agent.py            # text mode
 python agentos/agent.py --voice    # voice mode (micro + speech)
 ```
@@ -109,7 +110,10 @@ Flat module layout (imported by bare name, `agentos/` is on `sys.path[0]` when r
 
 - `db.py` — **SQLite, stdlib only** (`sqlite3`). The source of truth. Schema in `SCHEMA`; `connect(path)` creates the file + schema (path from `AGENTOS_DB` env, default `agentos/agentos.db`). Tables: `clients`, `projets`, `taches`, `finances`, `notes`. Every write function (`add_*`, `update_*`) returns the created/modified row as a JSON-serializable dict. `finance_summary()` returns revenus/dépenses/solde + dépenses par catégorie.
 - `tools.py` — `TOOLS` is the list of tool definitions sent to the Claude API. `dispatch(conn, name, args)` runs the requested tool against the DB via `_HANDLERS`, fires a best-effort Notion sync for write tools (`_SYNC_TABLE`), and returns a JSON string. **All tool errors are caught and returned as `{"erreur": ...}`** so a bad call surfaces to Claude instead of crashing the loop. Add a tool = a `db.py` function + a `TOOLS` entry + a `_HANDLERS` branch (+ `_SYNC_TABLE`/`_DB_ENV` for Notion).
-- `llm.py` — **the shared agent loop, stdlib only**. Calls the Claude Messages API directly via `urllib` (no `anthropic` SDK — keeps the Android APK light and the package dependency-free). `run_turn(conn, history, user_message, api_key=None, on_tool=None)` mutates `history` in place (plain JSON-compatible dicts), loops on `stop_reason == "tool_use"` executing tools and feeding `tool_result` blocks back, and returns the final text. Model `claude-fable-5` (the `_MODEL` constant), `max_tokens=1024`, French `SYSTEM` prompt. API/network errors are returned as a string, not raised. The key comes from `api_key` or `ANTHROPIC_API_KEY`. **Both `agent.py` and `agentmobile/` call this** — it is the one place the agent logic lives.
+- `llm.py` — **the shared agent loop, stdlib only** (urllib, no SDK — keeps the APK light and the package dependency-free). **Multi-provider**, selected by `AGENTOS_PROVIDER` (default `"groq"`, free; or `"anthropic"`, paid):
+  - `_run_openai` — Groq (OpenAI-compatible chat-completions + tool calling). `_openai_tools()` converts `TOOLS` from Anthropic shape to `{"type":"function","function":{…}}`; loops while `message.tool_calls` is present; tool results are `{"role":"tool","tool_call_id",…}`. Model from `GROQ_MODEL` (default `llama-3.3-70b-versatile`).
+  - `_run_anthropic` — Claude Messages API; loops on `stop_reason == "tool_use"`, feeds `tool_result` blocks back. Model `claude-fable-5`.
+  - **The message `history` format is provider-specific** — keep one provider per session/history. `run_turn(conn, history, user_message, api_key=None, on_tool=None)` picks the runner, mutates `history` in place, returns the final text. API/network errors are returned as a string, not raised. Key comes from `api_key` or the per-provider env var (`GROQ_API_KEY` / `ANTHROPIC_API_KEY`). **Both `agent.py` and `agentmobile/` call this** — the one place the agent logic lives.
 - `agent.py` — thin terminal/voice front-end, **same conventions as `jarvis/jarvis.py`** (module-level `VOICE_MODE`, conditional voice imports, `_history` global, same exit keywords). It delegates the actual turn to `llm.run_turn`, passing an `on_tool` callback that prints each tool call.
 - `notion_sync.py` — the **hybrid** layer. `sync_row(table, row)` mirrors a row to Notion via stdlib `urllib` (no SDK). **Best-effort and never raises**: a no-op returning `False` if `NOTION_TOKEN` or the per-table `NOTION_DB_*` env var is missing; network/API errors are caught and logged. The row's title field becomes the page title; full JSON goes in a code block in the page body (so no Notion schema constraints apply). SQLite stays the source of truth; Notion is just a mobile-readable mirror.
 
@@ -271,11 +275,12 @@ time, git-ignored): `agentos/{db,tools,notion_sync,llm}.py`.
 
 Key points specific to `agentmobile/`:
 
-- **No paid third-party service** — fully free. The only metered cost is Claude
-  API usage (per-token, no subscription); the user pastes their key into a
-  password `TextInput` (pre-filled from `ANTHROPIC_API_KEY` for desktop tests).
-- **Calls Claude via `llm.run_turn`** (urllib, no SDK), so `requirements` stays
-  `python3,kivy` — the APK builds without bundling `anthropic`/`httpx`/`pydantic`.
+- **Fully free by default** — the default provider is **Groq** (free key, no card).
+  No paid third-party service. The key field's hint/env-var adapt to `llm.PROVIDER`
+  (`GROQ_API_KEY` for groq, `ANTHROPIC_API_KEY` for anthropic); pre-filled from env
+  for desktop tests.
+- **Calls the model via `llm.run_turn`** (urllib, no SDK), so `requirements` stays
+  `python3,kivy` — the APK builds without bundling any HTTP/LLM SDK.
 - **DB path is `App.user_data_dir`** (writable on Android), passed to
   `db.connect(...)` — not the repo-relative default.
 - **Network call runs on a background `threading.Thread`**; UI updates marshalled
@@ -307,7 +312,7 @@ stdlib: `re`, `pathlib`, `subprocess`, `argparse`, `json`, `dataclasses`, `html`
 ## Key Architectural Decisions
 
 - **Modular separation + reuse-via-copy**: components are independent; the Kivy apps reuse a core folder by copying its modules at build time (not importing), keeping the core the single source of truth — `mobile/`+`monappli/` from `dataguard/`, `agentmobile/` from `agentos/`.
-- **SDK-free Claude calls in agentos**: `agentos/llm.py` talks to the Messages API via `urllib` instead of the `anthropic` SDK. This keeps the package stdlib-only and lets `agentmobile/` build an APK with just `python3,kivy` (no `httpx`/`pydantic` to cross-compile). `jarvis/` still uses the SDK.
+- **SDK-free, multi-provider agent**: `agentos/llm.py` talks to the LLM HTTP APIs via `urllib` instead of any SDK. This keeps the package stdlib-only and lets `agentmobile/` build an APK with just `python3,kivy`. It supports a **free default (Groq)** and an optional paid Claude path, switched by `AGENTOS_PROVIDER`. `jarvis/` still uses the `anthropic` SDK.
 - **Conditional voice loading**: jarvis imports audio libs only when `--voice` is present, avoiding dependency failures for text-only mode.
 - **Luhn validation**: credit card regex matches are verified by the Luhn checksum to suppress false positives.
 - **Redaction-first**: secrets are masked (`a***34`) before any display or logging; raw values never appear in output.

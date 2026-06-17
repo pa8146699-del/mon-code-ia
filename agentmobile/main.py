@@ -51,13 +51,17 @@ class AgentLayout(BoxLayout):
             size_hint_y=None, height=44, font_size="22sp",
         ))
 
+        # Le moteur (Groq gratuit par défaut, ou Claude) est choisi dans llm.py.
+        if llm.PROVIDER == "groq":
+            hint, env_var = "Clé API Groq (gratuite — console.groq.com)…", "GROQ_API_KEY"
+        else:
+            hint, env_var = "Clé API Claude (ANTHROPIC_API_KEY)…", "ANTHROPIC_API_KEY"
         self.key_input = TextInput(
-            hint_text="Clé API Claude (ANTHROPIC_API_KEY)…",
-            password=True, multiline=False,
+            hint_text=hint, password=True, multiline=False,
             size_hint_y=None, height=44,
         )
         # Pré-remplie si la variable d'environnement existe (test PC).
-        self.key_input.text = os.environ.get("ANTHROPIC_API_KEY", "")
+        self.key_input.text = os.environ.get(env_var, "")
         self.add_widget(self.key_input)
 
         scroll = ScrollView()

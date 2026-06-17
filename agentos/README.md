@@ -32,13 +32,26 @@ L'interface (toi) sert à **piloter** ; l'IA utilise les données pour **exécut
 
 ## Lancer
 
-```bash
-pip install -r agentos/requirements.txt
-export ANTHROPIC_API_KEY=ta-clé
+Par défaut AgentOS utilise **Groq** (gratuit). Récupère une clé gratuite sur
+https://console.groq.com (sans carte bancaire) :
 
-python agentos/agent.py            # mode texte
-python agentos/agent.py --voice    # mode vocal (micro + synthèse)
+```bash
+export GROQ_API_KEY=ta-clé-groq        # moteur gratuit (défaut)
+
+python agentos/agent.py                # mode texte (aucun pip install requis)
+python agentos/agent.py --voice        # mode vocal (pip install -r agentos/requirements.txt)
 ```
+
+Pour utiliser Claude (Fable 5) à la place (payant au token) :
+
+```bash
+export AGENTOS_PROVIDER=anthropic
+export ANTHROPIC_API_KEY=ta-clé-claude
+python agentos/agent.py
+```
+
+Le moteur est piloté par `AGENTOS_PROVIDER` (`groq` par défaut, ou `anthropic`).
+Tu peux changer le modèle Groq via `GROQ_MODEL` (défaut : `llama-3.3-70b-versatile`).
 
 Exemples de phrases :
 
@@ -53,8 +66,9 @@ Exemples de phrases :
 | Fichier | Rôle |
 |---|---|
 | `db.py` | Schéma + CRUD SQLite (5 domaines). Zéro dépendance. La source de vérité. |
-| `tools.py` | Définitions d'outils pour Claude + `dispatch()` (exécute + synchro Notion). |
-| `agent.py` | Boucle d'agent style Jarvis (texte / `--voice`) avec tool use. |
+| `tools.py` | Définitions d'outils + `dispatch()` (exécute + synchro Notion). |
+| `llm.py` | Boucle d'agent + appel API (Groq gratuit ou Claude), via urllib. |
+| `agent.py` | Front-end terminal/voix style Jarvis (texte / `--voice`). |
 | `notion_sync.py` | Synchro best-effort vers Notion (stdlib `urllib`). |
 | `test_agentos.py` | Tests (base + dispatch), sans appel API. |
 

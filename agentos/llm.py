@@ -1,14 +1,18 @@
 #!/usr/bin/env python3
-"""Client API Claude + boucle d'agent — stdlib pure (urllib, zéro SDK).
+"""Client API + boucle d'agent — stdlib pure (urllib, zéro SDK).
 
-Utiliser le SDK `anthropic` est pratique sur PC mais lourd à empaqueter pour
-Android (httpx, pydantic…). Ici on parle directement à l'API Messages via
-urllib : aucune dépendance externe, donc l'APK se build avec `python3,kivy`
-seulement, et le code est partagé entre `agent.py` (terminal/voix) et
-`agentmobile/` (Kivy).
+Deux moteurs au choix, via la variable d'environnement AGENTOS_PROVIDER :
 
-La seule chose qui se « paie » est l'usage de l'API au token (pas d'abonnement) :
-fournis une clé via ANTHROPIC_API_KEY ou l'argument api_key.
+    groq       (DÉFAUT) — GRATUIT. Clé gratuite sur https://console.groq.com
+               (sans carte bancaire). Modèle Llama, API compatible OpenAI.
+    anthropic  — Claude (Fable 5). Payant au token. Clé sur console.anthropic.com.
+
+Aucune dépendance externe : tout passe par urllib, donc l'APK se build avec
+`python3,kivy` seulement. Code partagé entre agent.py (terminal/voix) et
+agentmobile/ (Kivy).
+
+Clé : fournie via l'argument api_key, sinon lue dans l'environnement
+(GROQ_API_KEY pour groq, ANTHROPIC_API_KEY pour anthropic).
 """
 
 import json
@@ -18,9 +22,16 @@ import urllib.request
 
 from tools import TOOLS, dispatch
 
-_API = "https://api.anthropic.com/v1/messages"
-_MODEL = "claude-fable-5"
-_VERSION = "2023-06-01"
+PROVIDER = os.environ.get("AGENTOS_PROVIDER", "groq").lower()
+
+# --- Configuration par moteur ----------------------------------------------
+
+_GROQ_API = "https://api.groq.com/openai/v1/chat/completions"
+_GROQ_MODEL = os.environ.get("GROQ_MODEL", "llama-3.3-70b-versatile")
+
+_ANTHROPIC_API = "https://api.anthropic.com/v1/messages"
+_ANTHROPIC_MODEL = "claude-fable-5"
+_ANTHROPIC_VERSION = "2023-06-01"
 
 SYSTEM = (
     "Tu es AgentOS, un assistant personnel qui gère un système centralisé "
@@ -34,54 +45,85 @@ SYSTEM = (
 )
 
 
-def _call(messages: list[dict], api_key: str) -> dict:
-    """Un appel à l'API Messages. Retourne le JSON décodé."""
-    payload = {
-        "model": _MODEL,
-        "max_tokens": 1024,
-        "system": SYSTEM,
-        "tools": TOOLS,
-        "messages": messages,
-    }
+def _env_key() -> str | None:
+    return os.environ.get("GROQ_API_KEY" if PROVIDER == "groq" else "ANTHROPIC_API_KEY")
+
+
+def _post(url: str, payload: dict, headers: dict) -> dict:
     request = urllib.request.Request(
-        _API,
-        data=json.dumps(payload).encode("utf-8"),
-        headers={
-            "x-api-key": api_key,
-            "anthropic-version": _VERSION,
-            "content-type": "application/json",
-        },
-        method="POST",
+        url, data=json.dumps(payload).encode("utf-8"), headers=headers, method="POST"
     )
     with urllib.request.urlopen(request, timeout=60) as resp:
         return json.loads(resp.read().decode("utf-8"))
 
 
-def run_turn(conn, history: list[dict], user_message: str,
-             api_key: str | None = None, on_tool=None) -> str:
-    """Ajoute le message, déroule la boucle de tool use, retourne le texte final.
+# --- Moteur Groq / compatible OpenAI ---------------------------------------
 
-    `history` est muté en place (compatible JSON, réutilisable au tour suivant).
-    `on_tool(name, args)` est appelé avant chaque exécution d'outil (optionnel).
-    """
-    key = api_key or os.environ.get("ANTHROPIC_API_KEY")
-    if not key:
-        raise RuntimeError("Clé API manquante (ANTHROPIC_API_KEY ou argument api_key).")
+def _openai_tools() -> list[dict]:
+    """Convertit TOOLS (format Anthropic) vers le format function-calling OpenAI."""
+    return [
+        {
+            "type": "function",
+            "function": {
+                "name": t["name"],
+                "description": t["description"],
+                "parameters": t["input_schema"],
+            },
+        }
+        for t in TOOLS
+    ]
 
-    history.append({"role": "user", "content": user_message})
 
+def _run_openai(conn, history, key, on_tool) -> str:
+    headers = {"Authorization": f"Bearer {key}", "Content-Type": "application/json"}
     while True:
-        try:
-            response = _call(history, key)
-        except urllib.error.HTTPError as e:
-            return f"Erreur API ({e.code}) : {e.read().decode('utf-8', 'replace')}"
-        except (urllib.error.URLError, OSError) as e:
-            return f"Erreur réseau : {e}"
+        payload = {
+            "model": _GROQ_MODEL,
+            "max_tokens": 1024,
+            "messages": [{"role": "system", "content": SYSTEM}, *history],
+            "tools": _openai_tools(),
+        }
+        data = _post(_GROQ_API, payload, headers)
+        message = data["choices"][0]["message"]
+        history.append(message)
 
-        content = response.get("content", [])
+        calls = message.get("tool_calls")
+        if not calls:
+            return message.get("content") or ""
+
+        for call in calls:
+            name = call["function"]["name"]
+            try:
+                args = json.loads(call["function"].get("arguments") or "{}")
+            except json.JSONDecodeError:
+                args = {}
+            if on_tool:
+                on_tool(name, args)
+            output = dispatch(conn, name, args)
+            history.append({"role": "tool", "tool_call_id": call["id"], "content": output})
+
+
+# --- Moteur Anthropic / Claude ---------------------------------------------
+
+def _run_anthropic(conn, history, key, on_tool) -> str:
+    headers = {
+        "x-api-key": key,
+        "anthropic-version": _ANTHROPIC_VERSION,
+        "content-type": "application/json",
+    }
+    while True:
+        payload = {
+            "model": _ANTHROPIC_MODEL,
+            "max_tokens": 1024,
+            "system": SYSTEM,
+            "tools": TOOLS,
+            "messages": history,
+        }
+        data = _post(_ANTHROPIC_API, payload, headers)
+        content = data.get("content", [])
         history.append({"role": "assistant", "content": content})
 
-        if response.get("stop_reason") != "tool_use":
+        if data.get("stop_reason") != "tool_use":
             return "".join(b.get("text", "") for b in content if b.get("type") == "text")
 
         tool_results = []
@@ -92,10 +134,33 @@ def run_turn(conn, history: list[dict], user_message: str,
                 on_tool(block["name"], block["input"])
             output = dispatch(conn, block["name"], block["input"])
             tool_results.append(
-                {
-                    "type": "tool_result",
-                    "tool_use_id": block["id"],
-                    "content": output,
-                }
+                {"type": "tool_result", "tool_use_id": block["id"], "content": output}
             )
         history.append({"role": "user", "content": tool_results})
+
+
+# --- Point d'entrée ---------------------------------------------------------
+
+def run_turn(conn, history: list[dict], user_message: str,
+             api_key: str | None = None, on_tool=None) -> str:
+    """Ajoute le message, déroule la boucle de tool use, retourne le texte final.
+
+    `history` est muté en place. Son format dépend du moteur (AGENTOS_PROVIDER) ;
+    garde un même historique pour un même moteur sur toute la session.
+    `on_tool(name, args)` est appelé avant chaque exécution d'outil (optionnel).
+    """
+    key = api_key or _env_key()
+    if not key:
+        var = "GROQ_API_KEY" if PROVIDER == "groq" else "ANTHROPIC_API_KEY"
+        raise RuntimeError(f"Clé API manquante ({var} ou argument api_key).")
+
+    # En format OpenAI le message user est une chaîne ; en Anthropic aussi.
+    history.append({"role": "user", "content": user_message})
+
+    runner = _run_openai if PROVIDER == "groq" else _run_anthropic
+    try:
+        return runner(conn, history, key, on_tool)
+    except urllib.error.HTTPError as e:
+        return f"Erreur API ({e.code}) : {e.read().decode('utf-8', 'replace')}"
+    except (urllib.error.URLError, OSError) as e:
+        return f"Erreur réseau : {e}"
