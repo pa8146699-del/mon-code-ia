@@ -9,14 +9,17 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - `jarvis/` — a vocal/text assistant powered by the Claude API.
 - `dataguard/` — a command-line data-leak / phishing security toolkit (no external dependencies).
 - `mobile/` — a Kivy GUI wrapper around DataGuard, built into an Android APK by GitHub Actions.
+- `monappli/` — a second, personal Kivy security app reusing DataGuard, with its own combined "Tout analyser" action and its own APK build.
 
-`jarvis/` and `dataguard/` share no code. `mobile/` reuses `dataguard/detectors.py` and `dataguard/phishing.py` (copied in at build time, never committed under `mobile/`).
+`jarvis/` and `dataguard/` share no code. Both `mobile/` and `monappli/` reuse `dataguard/detectors.py` and `dataguard/phishing.py` (copied in at build time, never committed under those folders).
 
 ## Repository Layout
 
 ```
 mon-code-ia/
-├── .github/workflows/build-apk.yml   # CI: Android APK builder
+├── .github/workflows/
+│   ├── build-apk.yml                 # CI: mobile/ Android APK builder
+│   └── build-monappli.yml            # CI: monappli/ Android APK builder
 ├── .gitignore
 ├── CLAUDE.md
 ├── README.md
@@ -30,13 +33,17 @@ mon-code-ia/
 │   ├── report.py                     # HTML report generator
 │   ├── test_dataguard.py             # Test suite (pytest + zero-dep runner)
 │   └── README.md
-└── mobile/
-    ├── main.py                       # Kivy GUI (touch-friendly)
+├── mobile/
+│   ├── main.py                       # Kivy GUI (touch-friendly)
+│   ├── buildozer.spec                # Android build config
+│   └── README.md
+└── monappli/
+    ├── main.py                       # Personal Kivy GUI (adds "Tout analyser")
     ├── buildozer.spec                # Android build config
     └── README.md
 ```
 
-Files git-ignored under `mobile/`: `detectors.py`, `phishing.py`, `bin/`, `.buildozer/`, `*.apk`.
+Files git-ignored under `mobile/` and `monappli/`: `detectors.py`, `phishing.py`, `bin/`, `.buildozer/`, `*.apk`.
 
 ## Setup
 
@@ -160,6 +167,31 @@ Build:
 - Config lives in `mobile/buildozer.spec` (`requirements = python3,kivy`, targets API 34, minapi 24, both arm64-v8a and armeabi-v7a).
 - Local UI test: `pip install kivy`, copy the two modules in, then `python mobile/main.py`.
 
+## MonAppli (`monappli/`)
+
+`monappli/main.py` is a second, personal Kivy security app. It follows the exact
+same conventions as `mobile/` — imports `detectors` and `phishing` by bare name,
+with those modules copied in at build time by `.github/workflows/build-monappli.yml`
+(git-ignored under `monappli/`). It differs from `mobile/` in two ways:
+
+- **Own branding/identity**: title "🔐 MonAppli", package `org.moncodeia.monappli`,
+  artifact `monappli-apk`.
+- **Extra combined action**: alongside the two single-purpose buttons it adds a
+  "✅ Tout analyser" button (`analyze_all()`) that runs the secret scan and the
+  phishing analysis together and concatenates both reports.
+
+Shared report colours live in module-level `SEVERITY_COLORS` / `RISK_COLORS`
+dicts (rather than inline, as in `mobile/main.py`).
+
+Build/test mirrors `mobile/` exactly: the `Build APK MonAppli` workflow triggers
+on `workflow_dispatch` or pushes to `main` touching `monappli/**` (or its workflow
+file); local UI test is `pip install kivy`, copy the two modules in, then
+`python monappli/main.py`.
+
+When adding further reuse-of-DataGuard apps, follow this same template: a new
+folder, a `buildozer.spec` with a unique `package.name`, a matching workflow that
+copies `dataguard/{detectors,phishing}.py` in, and two new `.gitignore` entries.
+
 ## Dependencies
 
 | Package | Required for |
@@ -173,7 +205,7 @@ Build:
 
 ## Key Architectural Decisions
 
-- **Modular separation**: the three components are independent; only `dataguard/` ↔ `mobile/` share code, via copy (not import), keeping `dataguard/` the single source of truth.
+- **Modular separation**: the components are independent; only the Kivy apps (`mobile/`, `monappli/`) reuse `dataguard/`, via copy (not import), keeping `dataguard/` the single source of truth.
 - **Conditional voice loading**: jarvis imports audio libs only when `--voice` is present, avoiding dependency failures for text-only mode.
 - **Luhn validation**: credit card regex matches are verified by the Luhn checksum to suppress false positives.
 - **Redaction-first**: secrets are masked (`a***34`) before any display or logging; raw values never appear in output.
