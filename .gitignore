@@ -15,3 +15,4 @@ mobile/detectors.py
 mobile/phishing.py
 monappli/detectors.py
 monappli/phishing.py
+monappli/toolkit.py

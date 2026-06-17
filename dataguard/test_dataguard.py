@@ -8,6 +8,7 @@ from pathlib import Path
 
 import detectors
 import phishing
+import toolkit
 from report import build_html
 
 
@@ -103,6 +104,46 @@ def test_phishing_lien_ip():
 def test_phishing_domaine_legitime_non_signale():
     score, signals = phishing.analyze("Voir https://www.paypal.com/fr/account")
     assert not any(s.category == "Sosie" for s in signals)
+
+
+# --- Boîte à outils (mots de passe, hash) ----------------------------------
+
+def test_mot_de_passe_courant_tres_faible():
+    rapport = toolkit.password_strength("123456")
+    assert rapport.level == "TRÈS FAIBLE"
+    assert rapport.score <= 5
+    assert any("courant" in i for i in rapport.issues)
+
+
+def test_mot_de_passe_solide_bien_note():
+    rapport = toolkit.password_strength("J8!vQ2#mZ9pL@wR4")
+    assert rapport.level in {"FORT", "TRÈS FORT"}
+    assert rapport.score >= 60
+
+
+def test_mot_de_passe_vide():
+    rapport = toolkit.password_strength("")
+    assert rapport.score == 0
+
+
+def test_generation_mot_de_passe():
+    pw = toolkit.generate_password(16)
+    assert len(pw) == 16
+    assert any(c.islower() for c in pw)
+    assert any(c.isupper() for c in pw)
+    assert any(c.isdigit() for c in pw)
+    # Deux générations successives diffèrent (aléatoire).
+    assert toolkit.generate_password(16) != toolkit.generate_password(16)
+
+
+def test_hash_text_coherent():
+    import hashlib
+
+    h = toolkit.hash_text("bonjour")
+    assert h["SHA-256"] == hashlib.sha256(b"bonjour").hexdigest()
+    assert len(h["SHA-256"]) == 64
+    assert len(h["SHA-1"]) == 40
+    assert len(h["MD5"]) == 32
 
 
 # --- Rapport HTML ----------------------------------------------------------

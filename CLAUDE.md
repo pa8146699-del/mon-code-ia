@@ -30,6 +30,7 @@ mon-code-ia/
 │   ├── dataguard.py                  # Argparse dispatcher (cmd_* functions)
 │   ├── detectors.py                  # Secret-detection engine + Luhn + redact
 │   ├── phishing.py                   # Heuristic phishing scorer
+│   ├── toolkit.py                    # Password strength/gen + hashing (stdlib)
 │   ├── report.py                     # HTML report generator
 │   ├── test_dataguard.py             # Test suite (pytest + zero-dep runner)
 │   └── README.md
@@ -93,6 +94,7 @@ Module layout (all flat, imported by simple name since `dataguard/` is on `sys.p
 - `dataguard.py` — argparse subcommand dispatch (`cmd_*` functions). Each subcommand sets `func` via `set_defaults`. Interactive menu is `cmd_menu` (options 1–4).
 - `detectors.py` — the `DETECTORS` list and scanning logic (`scan`, `scan_file`, `scan_line`, `sort_findings`). Extend coverage by adding a `Detector(name, compiled_regex, severity)` entry. Credit-card hits are confirmed with the **Luhn checksum** (`luhn_valid`); all reported values are **redacted** (`redact`: first 4 chars + `***` + last 2 chars).
 - `phishing.py` — heuristic phishing scorer. `analyze(text)` returns `(score 0-100, [PhishingSignal])`; lookalike-domain detection normalizes digit-for-letter swaps (`paypa1` → `paypal`) and skips legitimate `brand.tld` hosts.
+- `toolkit.py` — extra stdlib-only security utilities (no detection): `password_strength(pw)` → `PasswordReport(score, level, entropy_bits, issues, tips)`; `generate_password(length, use_symbols)` using the `secrets` module (guarantees one char per required class, shuffles with `secrets.randbelow`); `hash_text(text)` → `{SHA-256, SHA-1, MD5}` hexdigests. Consumed by `monappli/`.
 - `report.py` — standalone HTML report (`build_html`); never embeds raw secrets.
 
 ### What `scan` detects
@@ -144,7 +146,7 @@ python -m pytest dataguard/                      # if pytest is installed
 cd dataguard && python test_dataguard.py         # zero-dependency fallback runner
 ```
 
-`test_dataguard.py` includes 18 tests: detector coverage (password, AWS key, Stripe key, Google API key, IBAN, email, valid/invalid credit card, clean text), redaction correctness, file scan, phishing scenarios (clean text, urgency+credentials, lookalike domain, IP link, legitimate domain not flagged), and HTML report correctness. The fallback runner auto-discovers `test_*` functions and supports a `tmp_path` fixture via `tempfile.TemporaryDirectory`.
+`test_dataguard.py` includes 22 tests: detector coverage (password, AWS key, Stripe key, Google API key, IBAN, email, valid/invalid credit card, clean text), redaction correctness, file scan, phishing scenarios (clean text, urgency+credentials, lookalike domain, IP link, legitimate domain not flagged), toolkit coverage (common-password rejection, strong password, empty password, password generation, hashing), and HTML report correctness. The fallback runner auto-discovers `test_*` functions and supports a `tmp_path` fixture via `tempfile.TemporaryDirectory`.
 
 ## Mobile App (`mobile/`)
 
@@ -169,28 +171,41 @@ Build:
 
 ## MonAppli (`monappli/`)
 
-`monappli/main.py` is a second, personal Kivy security app. It follows the exact
-same conventions as `mobile/` — imports `detectors` and `phishing` by bare name,
-with those modules copied in at build time by `.github/workflows/build-monappli.yml`
-(git-ignored under `monappli/`). It differs from `mobile/` in two ways:
+`monappli/main.py` is a personal, full **cybersecurity toolbox** — a Kivy app
+that exposes everything DataGuard can do for touch use. It follows the same
+conventions as `mobile/` (imports the security modules by bare name; they are
+copied in at build time and git-ignored) but reuses **three** modules —
+`detectors`, `phishing`, and `toolkit` — instead of two, and is wider in scope.
 
-- **Own branding/identity**: title "🔐 MonAppli", package `org.moncodeia.monappli`,
-  artifact `monappli-apk`.
-- **Extra combined action**: alongside the two single-purpose buttons it adds a
-  "✅ Tout analyser" button (`analyze_all()`) that runs the secret scan and the
-  phishing analysis together and concatenates both reports.
+Six tools, laid out in a 2-column `GridLayout`, all operating on the single
+shared `TextInput`:
 
-Shared report colours live in module-level `SEVERITY_COLORS` / `RISK_COLORS`
-dicts (rather than inline, as in `mobile/main.py`).
+| Button | Handler | Backed by |
+|---|---|---|
+| 🔍 Secrets | `scan_text()` | `detectors` |
+| 🎣 Phishing | `analyze_phishing()` | `phishing` |
+| ✅ Tout analyser | `analyze_all()` (concatenates both) | `detectors` + `phishing` |
+| 🔑 Force mot de passe | `check_password()` | `toolkit.password_strength` |
+| 🎲 Générer mot de passe | `make_password()` | `toolkit.generate_password` |
+| #️⃣ Empreintes (hash) | `hash_report()` | `toolkit.hash_text` |
 
-Build/test mirrors `mobile/` exactly: the `Build APK MonAppli` workflow triggers
-on `workflow_dispatch` or pushes to `main` touching `monappli/**` (or its workflow
-file); local UI test is `pip install kivy`, copy the two modules in, then
-`python monappli/main.py`.
+Conventions specific to `monappli/`:
+
+- Report colours live in module-level `SEVERITY_COLORS` / `RISK_COLORS` /
+  `PASSWORD_COLORS` dicts (not inline as in `mobile/main.py`).
+- `_esc()` escapes Kivy markup metacharacters (`[`, `]`, `&`) before any
+  user-supplied or generated string (e.g. generated passwords, redacted
+  excerpts) is rendered with `markup=True`. **Always escape dynamic text shown
+  in a markup Label** — generated passwords routinely contain `[`/`]`/`&`.
+
+Build/test mirrors `mobile/`: the `Build APK MonAppli` workflow triggers on
+`workflow_dispatch` or pushes to `main` touching `monappli/**` (or its workflow
+file), and copies `dataguard/{detectors,phishing,toolkit}.py` in. Local UI test:
+`pip install kivy`, copy the three modules in, then `python monappli/main.py`.
 
 When adding further reuse-of-DataGuard apps, follow this same template: a new
 folder, a `buildozer.spec` with a unique `package.name`, a matching workflow that
-copies `dataguard/{detectors,phishing}.py` in, and two new `.gitignore` entries.
+copies the needed `dataguard/*.py` modules in, and matching `.gitignore` entries.
 
 ## Dependencies
 
@@ -201,7 +216,7 @@ copies `dataguard/{detectors,phishing}.py` in, and two new `.gitignore` entries.
 | `pyttsx3>=2.90` | Text → speech, offline (`--voice` only) |
 | `PyAudio>=0.2.14` | Audio I/O backend for SpeechRecognition (`--voice` only) |
 
-`dataguard/` has **zero external dependencies** (pure Python 3 stdlib: `re`, `pathlib`, `subprocess`, `argparse`, `json`, `dataclasses`, `html`, `datetime`, `stat`).
+`dataguard/` has **zero external dependencies** (pure Python 3 stdlib: `re`, `pathlib`, `subprocess`, `argparse`, `json`, `dataclasses`, `html`, `datetime`, `stat`, plus `hashlib`, `secrets`, `math`, `string` for `toolkit.py`).
 
 ## Key Architectural Decisions
 

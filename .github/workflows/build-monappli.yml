@@ -31,7 +31,7 @@ jobs:
         run: git config --global --add safe.directory "$GITHUB_WORKSPACE"
 
       - name: Copier la logique DataGuard dans monappli/
-        run: cp dataguard/detectors.py dataguard/phishing.py monappli/
+        run: cp dataguard/detectors.py dataguard/phishing.py dataguard/toolkit.py monappli/
 
       - name: Construire l'APK avec Buildozer
         working-directory: monappli
