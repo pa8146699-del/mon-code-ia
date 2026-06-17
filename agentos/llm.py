@@ -19,7 +19,7 @@ import urllib.request
 from tools import TOOLS, dispatch
 
 _API = "https://api.anthropic.com/v1/messages"
-_MODEL = "claude-sonnet-4-6"
+_MODEL = "claude-fable-5"
 _VERSION = "2023-06-01"
 
 SYSTEM = (
