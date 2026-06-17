@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""DataGuard Mobile — interface tactile Kivy pour Android.
+"""DataGuard Mobile v1.2 — interface tactile Kivy pour Android.
 
 Pour tester l'interface sur ordinateur :
     pip install kivy
@@ -21,6 +21,7 @@ from kivy.uix.button import Button
 from kivy.uix.filechooser import FileChooserListView
 from kivy.uix.label import Label
 from kivy.uix.popup import Popup
+from kivy.uix.screenmanager import Screen, ScreenManager
 from kivy.uix.scrollview import ScrollView
 from kivy.uix.textinput import TextInput
 from kivy.uix.widget import Widget
@@ -30,6 +31,9 @@ try:
     _ANDROID = True
 except ImportError:
     _ANDROID = False
+
+MAX_HISTORY = 30
+_MARKUP_RE = re.compile(r'\[/?(?:b|i|color[^\]]*)\]')
 
 
 # --- Logique -----------------------------------------------------------------
@@ -82,16 +86,16 @@ def _analyze_phishing(text: str) -> tuple[str, int]:
     return "\n".join(lines), score
 
 
-# --- Barre de score ----------------------------------------------------------
+# --- Widget barre de score ---------------------------------------------------
 
 class ScoreBar(Widget):
-    """Barre colorée 0-100 : vert (0) → bleu → orange → rouge (100)."""
+    """Barre colorée 0-100 : vert → bleu → orange → rouge."""
 
     def __init__(self, **kwargs):
-        super().__init__(size_hint_y=None, height="20dp", **kwargs)
+        super().__init__(size_hint_y=None, height="18dp", **kwargs)
         self._score = 0
         with self.canvas.before:
-            self._bg_color = Color(0.15, 0.15, 0.15, 1)
+            self._bg_color = Color(0.13, 0.13, 0.13, 1)
             self._bg_rect = Rectangle(pos=self.pos, size=self.size)
             self._fill_color = Color(0.18, 0.8, 0.44, 1)
             self._fill_rect = Rectangle(pos=self.pos, size=(0, self.height))
@@ -116,159 +120,237 @@ class ScoreBar(Widget):
         self._fill_rect.size = (self.width * self._score / 100, self.height)
 
 
-# --- Interface principale ----------------------------------------------------
+# --- Helpers UI --------------------------------------------------------------
 
-_MARKUP_RE = re.compile(r'\[/?(?:b|color[^\]]*)\]')
+def _make_result_label() -> Label:
+    lbl = Label(
+        text="Le resultat s'affichera ici.",
+        markup=True,
+        size_hint_y=None,
+        halign="left",
+        valign="top",
+        padding=(8, 8),
+    )
+    lbl.bind(
+        width=lambda *_: setattr(lbl, "text_size", (lbl.width, None)),
+        texture_size=lambda *_: setattr(lbl, "height", lbl.texture_size[1]),
+    )
+    return lbl
 
 
-class DataGuardLayout(BoxLayout):
-    MAX_HISTORY = 20
+def _open_file_picker(screen):
+    """Ouvre un sélecteur de fichier et charge le contenu dans screen.input."""
+    start_path = "/sdcard/" if os.path.isdir("/sdcard/") else os.path.expanduser("~")
+    content = BoxLayout(orientation="vertical", spacing=6, padding=6)
+    chooser = FileChooserListView(path=start_path, size_hint_y=1)
+    btn_open = Button(
+        text="Ouvrir ce fichier",
+        size_hint_y=None,
+        height="48dp",
+        background_color=(0.2, 0.5, 0.8, 1),
+    )
+    content.add_widget(chooser)
+    content.add_widget(btn_open)
+    popup = Popup(title="Choisir un fichier", content=content, size_hint=(0.96, 0.92))
 
+    def do_open(*_):
+        if not chooser.selection:
+            return
+        popup.dismiss()
+        path = chooser.selection[0]
+        try:
+            text = open(path, encoding="utf-8", errors="ignore").read(50_000)
+        except OSError as e:
+            screen.result.text = f"Erreur lecture : {e}"
+            return
+        screen.input.text = text
+        screen.result.text = f"Fichier charge : {os.path.basename(path)}\nLance l'analyse."
+
+    btn_open.bind(on_release=do_open)
+    popup.open()
+
+
+# --- Écran Scanner -----------------------------------------------------------
+
+class ScannerScreen(Screen):
     def __init__(self, **kwargs):
-        super().__init__(orientation="vertical", padding=12, spacing=8, **kwargs)
-        self._history: list[dict] = []
+        super().__init__(**kwargs)
+        root = BoxLayout(orientation="vertical", padding=12, spacing=8)
 
-        self.add_widget(Label(
-            text="[b]DataGuard[/b]",
-            markup=True,
-            font_size="26sp",
-            size_hint_y=None,
-            height="48dp",
-        ))
-        self.add_widget(Label(
-            text="Colle un texte, un e-mail ou du code ci-dessous :",
-            size_hint_y=None,
-            height="26dp",
+        root.add_widget(Label(
+            text="[b]Scanner les secrets[/b]",
+            markup=True, font_size="20sp",
+            size_hint_y=None, height="42dp",
         ))
 
         self.input = TextInput(
-            hint_text="Colle ici le contenu a verifier...",
-            size_hint_y=0.30,
+            hint_text="Colle du code, un fichier de config, un token...",
+            size_hint_y=0.33,
         )
-        self.add_widget(self.input)
+        root.add_widget(self.input)
 
-        # Boutons principaux
-        row1 = BoxLayout(size_hint_y=None, height="52dp", spacing=8)
-        btn_scan = Button(text="Scanner les secrets", background_color=(0.2, 0.5, 0.8, 1))
-        btn_scan.bind(on_release=self.on_scan)
-        btn_phish = Button(text="Analyser phishing", background_color=(0.8, 0.4, 0.1, 1))
-        btn_phish.bind(on_release=self.on_phishing)
-        row1.add_widget(btn_scan)
-        row1.add_widget(btn_phish)
-        self.add_widget(row1)
+        row = BoxLayout(size_hint_y=None, height="52dp", spacing=8)
+        btn_scan = Button(text="Scanner", background_color=(0.2, 0.5, 0.8, 1))
+        btn_scan.bind(on_release=self._do_scan)
+        btn_clear = Button(text="Vider", size_hint_x=0.3, background_color=(0.3, 0.3, 0.3, 1))
+        btn_clear.bind(on_release=self._do_clear)
+        btn_file = Button(text="Fichier", size_hint_x=0.4, background_color=(0.2, 0.5, 0.3, 1))
+        btn_file.bind(on_release=lambda *_: _open_file_picker(self))
+        row.add_widget(btn_scan)
+        row.add_widget(btn_clear)
+        row.add_widget(btn_file)
+        root.add_widget(row)
 
-        # Boutons secondaires
-        row2 = BoxLayout(size_hint_y=None, height="44dp", spacing=8)
-        btn_clear = Button(text="Vider", background_color=(0.35, 0.35, 0.35, 1))
-        btn_clear.bind(on_release=self._on_clear)
-        btn_file = Button(text="Choisir fichier", background_color=(0.25, 0.55, 0.3, 1))
-        btn_file.bind(on_release=self.on_pick_file)
-        self._btn_hist = Button(text="Historique (0)", background_color=(0.45, 0.25, 0.6, 1))
-        self._btn_hist.bind(on_release=self.on_history)
-        row2.add_widget(btn_clear)
-        row2.add_widget(btn_file)
-        row2.add_widget(self._btn_hist)
-        self.add_widget(row2)
-
-        # Barre de score
         self._score_bar = ScoreBar()
-        self.add_widget(self._score_bar)
-        self._score_label = Label(
+        root.add_widget(self._score_bar)
+        self._score_lbl = Label(
             text="Score de risque : --",
-            size_hint_y=None,
-            height="20dp",
-            font_size="12sp",
-            color=(0.65, 0.65, 0.65, 1),
+            size_hint_y=None, height="20dp",
+            font_size="12sp", color=(0.6, 0.6, 0.6, 1),
         )
-        self.add_widget(self._score_label)
+        root.add_widget(self._score_lbl)
 
-        # Zone de résultat
-        scroll = ScrollView()
-        self.result = Label(
-            text="Le resultat s'affichera ici.",
-            markup=True,
-            size_hint_y=None,
-            halign="left",
-            valign="top",
-            padding=(8, 8),
-        )
-        self.result.bind(
-            width=lambda *_: setattr(self.result, "text_size", (self.result.width, None)),
-            texture_size=lambda *_: setattr(self.result, "height", self.result.texture_size[1]),
-        )
-        scroll.add_widget(self.result)
-        self.add_widget(scroll)
+        sv = ScrollView()
+        self.result = _make_result_label()
+        sv.add_widget(self.result)
+        root.add_widget(sv)
 
-    # --- Actions -------------------------------------------------------------
+        self.add_widget(root)
 
-    def _show_result(self, report: str, score: int, kind: str):
-        self.result.text = report
-        self._score_bar.set_score(score)
-        self._score_label.text = f"Score de risque : {score}/100"
-        self._add_history(kind, report, score)
-
-    def on_scan(self, *_):
+    def _do_scan(self, *_):
         text = self.input.text.strip()
         if not text:
             self.result.text = "Colle d'abord du texte a analyser."
             return
         report, score = _scan_text(text)
-        self._show_result(report, score, "Secrets")
+        self.result.text = report
+        self._score_bar.set_score(score)
+        self._score_lbl.text = f"Score de risque : {score}/100"
+        App.get_running_app().add_history("Secrets", report, score)
 
-    def on_phishing(self, *_):
+    def _do_clear(self, *_):
+        self.input.text = ""
+        self.result.text = "Le resultat s'affichera ici."
+        self._score_bar.set_score(0)
+        self._score_lbl.text = "Score de risque : --"
+
+
+# --- Écran Phishing ----------------------------------------------------------
+
+class PhishingScreen(Screen):
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        root = BoxLayout(orientation="vertical", padding=12, spacing=8)
+
+        root.add_widget(Label(
+            text="[b]Analyser phishing[/b]",
+            markup=True, font_size="20sp",
+            size_hint_y=None, height="42dp",
+        ))
+
+        self.input = TextInput(
+            hint_text="Colle un e-mail, SMS ou message suspect...",
+            size_hint_y=0.33,
+        )
+        root.add_widget(self.input)
+
+        row = BoxLayout(size_hint_y=None, height="52dp", spacing=8)
+        btn_analyze = Button(text="Analyser", background_color=(0.8, 0.4, 0.1, 1))
+        btn_analyze.bind(on_release=self._do_analyze)
+        btn_clear = Button(text="Vider", size_hint_x=0.3, background_color=(0.3, 0.3, 0.3, 1))
+        btn_clear.bind(on_release=self._do_clear)
+        row.add_widget(btn_analyze)
+        row.add_widget(btn_clear)
+        root.add_widget(row)
+
+        self._score_bar = ScoreBar()
+        root.add_widget(self._score_bar)
+        self._score_lbl = Label(
+            text="Score de risque : --",
+            size_hint_y=None, height="20dp",
+            font_size="12sp", color=(0.6, 0.6, 0.6, 1),
+        )
+        root.add_widget(self._score_lbl)
+
+        sv = ScrollView()
+        self.result = _make_result_label()
+        sv.add_widget(self.result)
+        root.add_widget(sv)
+
+        self.add_widget(root)
+
+    def _do_analyze(self, *_):
         text = self.input.text.strip()
         if not text:
             self.result.text = "Colle d'abord du texte a analyser."
             return
         report, score = _analyze_phishing(text)
-        self._show_result(report, score, "Phishing")
+        self.result.text = report
+        self._score_bar.set_score(score)
+        self._score_lbl.text = f"Score de risque : {score}/100"
+        App.get_running_app().add_history("Phishing", report, score)
 
-    def _on_clear(self, *_):
+    def _do_clear(self, *_):
         self.input.text = ""
         self.result.text = "Le resultat s'affichera ici."
         self._score_bar.set_score(0)
-        self._score_label.text = "Score de risque : --"
+        self._score_lbl.text = "Score de risque : --"
 
-    def on_pick_file(self, *_):
-        start_path = "/sdcard/" if os.path.isdir("/sdcard/") else os.path.expanduser("~")
-        content = BoxLayout(orientation="vertical", spacing=6, padding=6)
-        chooser = FileChooserListView(path=start_path, size_hint_y=1)
-        btn_open = Button(text="Ouvrir ce fichier", size_hint_y=None, height="48dp",
-                          background_color=(0.2, 0.5, 0.8, 1))
-        content.add_widget(chooser)
-        content.add_widget(btn_open)
 
-        popup = Popup(title="Choisir un fichier", content=content, size_hint=(0.96, 0.92))
+# --- Écran Historique --------------------------------------------------------
 
-        def do_open(*_):
-            if not chooser.selection:
-                return
-            popup.dismiss()
-            path = chooser.selection[0]
-            try:
-                text = open(path, encoding="utf-8", errors="ignore").read(50_000)
-            except OSError as e:
-                self.result.text = f"Erreur lecture : {e}"
-                return
-            self.input.text = text
-            self.result.text = f"Fichier charge : {os.path.basename(path)}\nAppuie sur Scanner ou Analyser."
+class HistoriqueScreen(Screen):
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        root = BoxLayout(orientation="vertical", padding=12, spacing=8)
 
-        btn_open.bind(on_release=do_open)
-        popup.open()
+        header = BoxLayout(size_hint_y=None, height="42dp", spacing=8)
+        header.add_widget(Label(
+            text="[b]Historique[/b]",
+            markup=True, font_size="20sp",
+        ))
+        btn_export = Button(
+            text="Exporter .txt",
+            size_hint_x=0.42,
+            background_color=(0.45, 0.25, 0.6, 1),
+        )
+        btn_export.bind(on_release=self._do_export)
+        btn_clear = Button(
+            text="Effacer",
+            size_hint_x=0.28,
+            background_color=(0.5, 0.15, 0.15, 1),
+        )
+        btn_clear.bind(on_release=self._do_clear_history)
+        header.add_widget(btn_export)
+        header.add_widget(btn_clear)
+        root.add_widget(header)
 
-    def on_history(self, *_):
-        if not self._history:
-            Popup(
-                title="Historique",
-                content=Label(text="Aucune analyse pour l'instant."),
-                size_hint=(0.8, 0.4),
-            ).open()
+        self._entries_box = BoxLayout(
+            orientation="vertical", spacing=6, size_hint_y=None
+        )
+        self._entries_box.bind(minimum_height=self._entries_box.setter("height"))
+        sv = ScrollView()
+        sv.add_widget(self._entries_box)
+        root.add_widget(sv)
+
+        self.add_widget(root)
+
+    def on_enter(self, *_):
+        self._refresh()
+
+    def _refresh(self):
+        self._entries_box.clear_widgets()
+        history = App.get_running_app().history
+        if not history:
+            self._entries_box.add_widget(
+                Label(
+                    text="Aucune analyse pour l'instant.\nLance un scan ou une analyse phishing.",
+                    size_hint_y=None, height="80dp",
+                    halign="center",
+                )
+            )
             return
-
-        box = BoxLayout(orientation="vertical", spacing=4, padding=6, size_hint_y=None)
-        box.bind(minimum_height=box.setter("height"))
-
-        for entry in reversed(self._history):
+        for entry in reversed(history):
             color = (
                 "e74c3c" if entry["score"] >= 70 else
                 "e67e22" if entry["score"] >= 40 else
@@ -284,45 +366,117 @@ class DataGuardLayout(BoxLayout):
                 ),
                 markup=True,
                 size_hint_y=None,
-                height="60dp",
+                height="58dp",
                 halign="left",
                 valign="middle",
             )
             lbl.bind(width=lambda w, *_: setattr(w, "text_size", (w.width, None)))
-            box.add_widget(lbl)
+            self._entries_box.add_widget(lbl)
 
-        sv = ScrollView()
-        sv.add_widget(box)
+    def _do_clear_history(self, *_):
+        App.get_running_app().history.clear()
+        self._refresh()
+
+    def _do_export(self, *_):
+        history = App.get_running_app().history
+        if not history:
+            Popup(
+                title="Export",
+                content=Label(text="Aucune donnee a exporter.", halign="center"),
+                size_hint=(0.8, 0.3),
+            ).open()
+            return
+
+        lines = [
+            f"=== DataGuard — Rapport ({datetime.now().strftime('%Y-%m-%d %H:%M')}) ===",
+            "",
+        ]
+        for entry in history:
+            plain = _MARKUP_RE.sub("", entry.get("full", entry["summary"]))
+            lines += [
+                f"[{entry['time']}] {entry['kind']} — score {entry['score']}/100",
+                plain.strip(),
+                "-" * 50,
+                "",
+            ]
+
+        export_dir = "/sdcard/DataGuard" if os.path.isdir("/sdcard") else os.path.expanduser("~/DataGuard")
+        try:
+            os.makedirs(export_dir, exist_ok=True)
+            filename = f"rapport_{datetime.now().strftime('%Y%m%d_%H%M%S')}.txt"
+            path = os.path.join(export_dir, filename)
+            with open(path, "w", encoding="utf-8") as f:
+                f.write("\n".join(lines))
+            msg = f"Rapport sauvegarde :\n{path}"
+        except OSError as e:
+            msg = f"Erreur export : {e}"
+
         Popup(
-            title=f"Historique ({len(self._history)} analyses)",
-            content=sv,
-            size_hint=(0.96, 0.88),
+            title="Export",
+            content=Label(text=msg, halign="center"),
+            size_hint=(0.92, 0.38),
         ).open()
 
-    # --- Historique interne --------------------------------------------------
 
-    def _add_history(self, kind: str, report: str, score: int):
+# --- Application principale --------------------------------------------------
+
+class DataGuardApp(App):
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        self.history: list[dict] = []
+        self._tab_buttons: list[Button] = []
+        self._sm: ScreenManager | None = None
+
+    def build(self):
+        self.title = "DataGuard"
+
+        self._sm = ScreenManager()
+        self._sm.add_widget(ScannerScreen(name="scanner"))
+        self._sm.add_widget(PhishingScreen(name="phishing"))
+        self._sm.add_widget(HistoriqueScreen(name="historique"))
+
+        root = BoxLayout(orientation="vertical")
+        root.add_widget(self._sm)
+
+        # Barre de navigation en bas
+        tab_bar = BoxLayout(size_hint_y=None, height="52dp", spacing=2)
+        tabs = [
+            ("scanner",    "Scanner",     (0.2, 0.5, 0.8, 1)),
+            ("phishing",   "Phishing",    (0.8, 0.4, 0.1, 1)),
+            ("historique", "Historique",  (0.45, 0.25, 0.6, 1)),
+        ]
+        for screen_name, label, color in tabs:
+            btn = Button(text=label, background_color=color)
+            btn.bind(on_release=lambda x, n=screen_name: self._go_to(n))
+            self._tab_buttons.append(btn)
+            tab_bar.add_widget(btn)
+
+        root.add_widget(tab_bar)
+        return root
+
+    def _go_to(self, name: str):
+        if self._sm:
+            self._sm.current = name
+
+    def on_start(self):
+        if _ANDROID:
+            request_permissions([
+                Permission.READ_EXTERNAL_STORAGE,
+                Permission.WRITE_EXTERNAL_STORAGE,
+            ])
+
+    def add_history(self, kind: str, report: str, score: int):
         plain = _MARKUP_RE.sub("", report).strip()
-        summary = plain.splitlines()[0][:60] if plain else ""
-        self._history.append({
+        summary = plain.splitlines()[0][:65] if plain else ""
+        self.history.append({
             "kind": kind,
             "score": score,
             "time": datetime.now().strftime("%H:%M:%S"),
             "summary": summary,
+            "full": plain,
         })
-        if len(self._history) > self.MAX_HISTORY:
-            self._history.pop(0)
-        self._btn_hist.text = f"Historique ({len(self._history)})"
-
-
-class DataGuardApp(App):
-    def build(self):
-        self.title = "DataGuard"
-        return DataGuardLayout()
-
-    def on_start(self):
-        if _ANDROID:
-            request_permissions([Permission.READ_EXTERNAL_STORAGE])
+        if len(self.history) > MAX_HISTORY:
+            self.history.pop(0)
 
 
 if __name__ == "__main__":

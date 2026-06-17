@@ -11,53 +11,79 @@ demande d'identifiants, liens suspects, domaines sosies, etc.
 import re
 from dataclasses import dataclass
 
-# --- Listes d'indices ------------------------------------------------------
+# --- Listes d'indices ---------------------------------------------------------
 
-# Mots/expressions qui créent un sentiment d'urgence ou de pression.
 URGENCY_TERMS = [
+    # Français
     "urgent", "immédiatement", "immediatement", "dès maintenant", "des maintenant",
-    "agissez maintenant", "act now", "dernier avertissement", "expire", "suspendu",
+    "agissez maintenant", "dernier avertissement", "expire", "suspendu",
     "suspendue", "bloqué", "bloque", "bloquée", "désactivé", "desactive",
-    "votre compte sera", "sous 24 heures", "sous 48 heures", "verify now",
-    "vérifiez maintenant", "verifiez maintenant",
+    "votre compte sera", "sous 24 heures", "sous 48 heures", "dans les 24",
+    "dans les 48", "48h", "24h", "vérifiez maintenant", "verifiez maintenant",
+    "accès restreint", "acces restreint", "compte bloqué", "compte suspendu",
+    "avertissement final", "dernière chance", "derniere chance",
+    # Anglais
+    "act now", "verify now", "immediate action", "action required",
+    "limited time", "expires soon", "your account has been", "warning:",
+    "final notice", "last chance", "account suspended", "account locked",
+    "unusual activity", "suspicious activity",
 ]
 
-# Demandes d'informations confidentielles.
 CREDENTIAL_TERMS = [
-    "mot de passe", "password", "identifiant", "identifiants", "code pin",
+    # Français
+    "mot de passe", "identifiant", "identifiants", "code pin",
     "code secret", "numéro de carte", "numero de carte", "carte bancaire",
     "cvv", "code de sécurité", "code de securite", "confirmez vos",
-    "confirmer vos", "mettez à jour vos", "mettez a jour vos", "vos coordonnées bancaires",
-    "vos coordonnees bancaires", "connectez-vous", "saisissez vos",
+    "confirmer vos", "mettez à jour vos", "mettez a jour vos",
+    "vos coordonnées bancaires", "vos coordonnees bancaires",
+    "connectez-vous", "saisissez vos", "numéro de sécurité sociale",
+    "numero de securite sociale", "code de vérification",
+    # Anglais
+    "password", "username", "enter your", "social security", "ssn",
+    "authentication code", "one-time password", "otp", "2fa code",
+    "credit card", "bank account", "routing number", "verify your",
 ]
 
-# Salutations génériques typiques des envois de masse.
 GENERIC_GREETINGS = [
     "cher client", "chère cliente", "chere cliente", "cher utilisateur",
     "dear customer", "dear user", "cher membre", "bonjour cher",
+    "valued customer", "dear account holder",
 ]
 
-# TLD souvent associés à des campagnes malveillantes.
-SUSPICIOUS_TLDS = {".xyz", ".top", ".tk", ".ml", ".ga", ".cf", ".gq", ".zip", ".mov"}
+FAKE_SECURITY_TERMS = [
+    "système sécurisé", "systeme securise", "connexion sécurisée",
+    "official notice", "avis officiel", "we have detected",
+    "nous avons détecté", "nous avons detecte", "votre appareil a été",
+    "your device has been", "virus detected", "your computer is infected",
+]
 
-# Raccourcisseurs d'URL qui masquent la vraie destination.
-URL_SHORTENERS = {
-    "bit.ly", "tinyurl.com", "goo.gl", "t.co", "ow.ly", "is.gd", "buff.ly",
-    "cutt.ly", "rebrand.ly", "shorturl.at",
+SUSPICIOUS_TLDS = {
+    ".xyz", ".top", ".tk", ".ml", ".ga", ".cf", ".gq",
+    ".zip", ".mov", ".club", ".work", ".date", ".faith",
+    ".loan", ".win", ".bid", ".stream",
 }
 
-# Marques fréquemment usurpées (pour repérer les domaines sosies).
+URL_SHORTENERS = {
+    "bit.ly", "tinyurl.com", "goo.gl", "t.co", "ow.ly", "is.gd",
+    "buff.ly", "cutt.ly", "rebrand.ly", "shorturl.at",
+    "rb.gy", "qr.ae", "bl.ink", "short.io", "v.gd",
+}
+
 COMMON_BRANDS = [
-    "paypal", "google", "apple", "microsoft", "amazon", "netflix", "facebook",
-    "instagram", "impots", "ameli", "laposte", "orange", "free", "sfr",
-    "bnpparibas", "creditagricole", "societegenerale", "banque",
+    "paypal", "google", "apple", "microsoft", "amazon", "netflix",
+    "facebook", "instagram", "impots", "ameli", "laposte", "orange",
+    "free", "sfr", "bnpparibas", "creditagricole", "societegenerale",
+    "banque", "twitter", "linkedin", "ebay", "dhl", "fedex", "ups",
+    "caf", "securitesociale", "assurancemaladie",
 ]
 
 URL_REGEX = re.compile(r"https?://[^\s<>\"')]+", re.IGNORECASE)
 DOMAIN_REGEX = re.compile(r"https?://([^/\s:]+)", re.IGNORECASE)
 ATTACHMENT_REGEX = re.compile(
-    r"\b[\w\-. ]+\.(?:exe|scr|zip|rar|js|vbs|bat|cmd|iso|docm|xlsm)\b", re.IGNORECASE
+    r"\b[\w\-. ]+\.(?:exe|scr|zip|rar|js|vbs|bat|cmd|iso|docm|xlsm|ps1|lnk)\b",
+    re.IGNORECASE,
 )
+PUNYCODE_REGEX = re.compile(r"xn--[a-z0-9\-]+", re.IGNORECASE)
 
 
 @dataclass
@@ -76,25 +102,17 @@ def _contains_any(text: str, terms: list[str]) -> list[str]:
 
 
 def _looks_like_lookalike(domain: str) -> str | None:
-    """Détecte un domaine qui imite une marque connue sans être officiel.
-
-    Exemple : 'paypa1.com', 'g00gle-secure.net', 'apple.verify-login.com'.
-    Retourne la marque imitée si suspicion, sinon None.
-    """
+    """Détecte un domaine qui imite une marque connue sans être officiel."""
     host = domain.lower().split(":")[0]
-    # Caractères trompeurs : chiffres remplaçant des lettres.
     normalized = (
         host.replace("0", "o").replace("1", "l").replace("3", "e").replace("5", "s")
     )
     for brand in COMMON_BRANDS:
         if brand in normalized:
-            # Domaine officiel approximatif : brand.tld ou www.brand.tld
             labels = host.split(".")
-            # Le label principal (avant le TLD) est-il exactement la marque ?
             main = labels[-2] if len(labels) >= 2 else host
             if main == brand:
-                return None  # ressemble au domaine légitime
-            # La marque apparaît ailleurs (sous-domaine, tirets, sosie).
+                return None
             return brand
     return None
 
@@ -112,22 +130,27 @@ def analyze(text: str) -> tuple[int, list[PhishingSignal]]:
         )
 
     for term in _contains_any(text, GENERIC_GREETINGS):
+        signals.append(PhishingSignal("Salutation", f"Salutation générique : « {term} »", 5))
+
+    for term in _contains_any(text, FAKE_SECURITY_TERMS):
         signals.append(
-            PhishingSignal("Salutation", f"Salutation générique : « {term} »", 5)
+            PhishingSignal("Fausse sécurité", f"Discours de sécurité trompeur : « {term} »", 12)
         )
 
     # Analyse des URLs.
     urls = URL_REGEX.findall(text)
     domains = DOMAIN_REGEX.findall(text)
+
     for url in urls:
         if not url.lower().startswith("https://"):
-            signals.append(PhishingSignal("Lien", f"Lien non sécurisé (http) : {url}", 8))
-        if "xn--" in url.lower():
-            signals.append(PhishingSignal("Lien", f"Domaine punycode trompeur : {url}", 20))
+            signals.append(PhishingSignal("Lien", f"Lien non sécurisé (http) : {url[:60]}", 8))
+        if PUNYCODE_REGEX.search(url):
+            signals.append(
+                PhishingSignal("Lien", f"Domaine punycode (homoglyphe) : {url[:60]}", 25)
+            )
 
     for domain in domains:
         host = domain.lower().split(":")[0]
-        # URL basée sur une adresse IP.
         if re.fullmatch(r"(?:\d{1,3}\.){3}\d{1,3}", host):
             signals.append(PhishingSignal("Lien", f"Lien vers une adresse IP : {host}", 20))
         if host in URL_SHORTENERS:
