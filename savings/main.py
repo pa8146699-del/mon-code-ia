@@ -43,6 +43,32 @@ def fmt_money(amount):
     return f"{sign}{integer_part},{parts[1]} €"
 
 
+def future_value(principal, monthly, annual_rate_pct, months):
+    """Valeur future avec intérêts composés mensuels + versements mensuels."""
+    if annual_rate_pct <= 0:
+        return principal + monthly * months
+    i = annual_rate_pct / 100.0 / 12.0
+    growth = (1 + i) ** months
+    return principal * growth + monthly * ((growth - 1) / i)
+
+
+def months_to_goal(principal, monthly, annual_rate_pct, goal):
+    """Nombre de mois pour atteindre l'objectif (intérêts composés)."""
+    if principal >= goal:
+        return 0
+    if annual_rate_pct <= 0:
+        return (goal - principal) / monthly if monthly > 0 else float("inf")
+    i = annual_rate_pct / 100.0 / 12.0
+    base = principal + monthly / i
+    if base <= 0:
+        return float("inf")
+    target = (goal + monthly / i) / base
+    if target <= 1:
+        return float("inf")
+    import math
+    return math.log(target) / math.log(1 + i)
+
+
 def hex_to_rgb(h):
     h = h.lstrip("#")
     return tuple(int(h[i:i+2], 16) / 255.0 for i in (0, 2, 4))
@@ -122,6 +148,7 @@ class SavingsApp(App):
     def build(self):
         self.conn = db_connect()
         self.current_tab = "dashboard"
+        self.rate_pct = 3  # rendement annuel par défaut (%)
 
         root = BoxLayout(orientation="vertical", spacing=0)
         bg_card(root, 0.07, 0.08, 0.13)
@@ -230,7 +257,7 @@ class SavingsApp(App):
         total   = sum(r["current_total"]  for r in rows)
         monthly = sum(r["monthly_amount"] for r in rows)
         pct     = min(total / GOAL * 100, 100) if GOAL else 0
-        months_left = (GOAL - total) / monthly if monthly > 0 and total < GOAL else (0 if total >= GOAL else float("inf"))
+        months_left = months_to_goal(total, monthly, self.rate_pct, GOAL)
         return rows, total, monthly, pct, months_left
 
     def refresh(self):
@@ -250,9 +277,9 @@ class SavingsApp(App):
         else:
             yrs = months_left / 12
             if yrs >= 2:
-                self.eta_lbl.text = f"⏱ Environ {yrs:.1f} ans ({int(months_left)} mois) pour atteindre l'objectif"
+                self.eta_lbl.text = f"⏱ ~{yrs:.1f} ans ({int(months_left)} mois) à {self.rate_pct}% de rendement"
             else:
-                self.eta_lbl.text = f"⏱ Environ {int(months_left)} mois pour atteindre l'objectif"
+                self.eta_lbl.text = f"⏱ ~{int(months_left)} mois à {self.rate_pct}% de rendement"
 
         # Content
         self.content_area.clear_widgets()
@@ -347,26 +374,59 @@ class SavingsApp(App):
 
         # Projection table
         self.content_area.add_widget(Label(
-            text="[b]Projections[/b]",
+            text="[b]Projections (intérêts composés)[/b]",
             markup=True, color=(0.7, 0.7, 0.7, 1),
             size_hint_y=None, height=dp(30), font_size=dp(14),
         ))
+
+        # Sélecteur de rendement annuel (1 → 30 %)
+        rate_row = BoxLayout(size_hint_y=None, height=dp(46), spacing=dp(6),
+                             padding=(dp(4), 0))
+        rate_row.add_widget(Label(
+            text="Rendement annuel :", color=(0.75, 0.75, 0.75, 1),
+            halign="left", text_size=(None, None),
+            size_hint_x=0.5, font_size=dp(13),
+        ))
+        rate_spinner = Spinner(
+            text=f"{self.rate_pct} %",
+            values=[f"{p} %" for p in range(1, 31)],
+            size_hint_x=0.5,
+            background_normal="", background_color=(0.18, 0.28, 0.5, 1),
+            font_size=dp(14), color=(1, 1, 1, 1),
+        )
+        rate_spinner.bind(text=self._on_rate_change)
+        rate_row.add_widget(rate_spinner)
+        self.content_area.add_widget(rate_row)
+
         for label, months in [("1 an", 12), ("5 ans", 60), ("10 ans", 120), ("20 ans", 240)]:
-            projected = total + monthly * months
-            pc = card("#111827", height=44, padding=10, spacing=4, orientation="horizontal")
-            pc.add_widget(Label(
-                text=f"Dans {label} :", color=(0.7, 0.7, 0.7, 1),
-                halign="left", text_size=(None, None),
-                size_hint_x=0.35, font_size=dp(12),
+            projected = future_value(total, monthly, self.rate_pct, months)
+            gains = projected - (total + monthly * months)
+            pc = card("#111827", height=52, padding=10, spacing=4, orientation="horizontal")
+            left = BoxLayout(orientation="vertical", size_hint_x=0.4)
+            left.add_widget(Label(
+                text=f"Dans {label}", color=(0.8, 0.8, 0.8, 1),
+                halign="left", text_size=(None, None), font_size=dp(13),
             ))
+            left.add_widget(Label(
+                text=f"[color=#777777]dont +{_esc(fmt_money(gains))} d'intérêts[/color]",
+                markup=True, halign="left", text_size=(None, None), font_size=dp(10),
+            ))
+            pc.add_widget(left)
             color = "#81C784" if projected >= GOAL else "#FFB74D"
             pc.add_widget(Label(
                 text=f"[b][color={color}]{_esc(fmt_money(projected))}[/color][/b]"
                      + (" 🏆" if projected >= GOAL else ""),
                 markup=True, halign="right",
-                text_size=(None, None), size_hint_x=0.65, font_size=dp(13),
+                text_size=(None, None), size_hint_x=0.6, font_size=dp(13),
             ))
             self.content_area.add_widget(pc)
+
+    def _on_rate_change(self, spinner, text):
+        try:
+            self.rate_pct = int(text.replace("%", "").strip())
+        except ValueError:
+            self.rate_pct = 0
+        self.refresh()
 
     # ── Vehicles tab ──────────────────────────────────────────────────────────
 

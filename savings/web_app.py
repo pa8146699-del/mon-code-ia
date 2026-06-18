@@ -164,17 +164,6 @@ def render_dashboard(conn):
     rows, total, monthly, pct, months_left = get_stats(conn)
     reste = max(GOAL - total, 0)
 
-    if total >= GOAL:
-        eta_html = '<div class="eta">🎉 Félicitations — objectif atteint !</div>'
-    elif months_left == float("inf"):
-        eta_html = '<div class="eta">⏱ Configurez vos versements mensuels pour voir l\'ETA</div>'
-    else:
-        yrs = months_left / 12
-        if yrs >= 2:
-            eta_html = f'<div class="eta">⏱ Environ {yrs:.1f} ans ({int(months_left)} mois) pour atteindre l\'objectif</div>'
-        else:
-            eta_html = f'<div class="eta">⏱ Environ {int(months_left)} mois pour atteindre l\'objectif</div>'
-
     vehicles_html = ""
     for row in rows:
         color = VEHICLE_COLORS[row["color_idx"] % len(VEHICLE_COLORS)]
@@ -189,16 +178,10 @@ def render_dashboard(conn):
           <div class="small">{pct_v:.3f}% de l'objectif &nbsp;|&nbsp; {monthly_h} / mois</div>
         </div>"""
 
-    projections = ""
-    for label, months in [("1 an", 12), ("5 ans", 60), ("10 ans", 120), ("20 ans", 240)]:
-        projected = total + monthly * months
-        color = "#56d364" if projected >= GOAL else "#f0883e"
-        trophy = " 🏆" if projected >= GOAL else ""
-        projections += f"""
-        <div class="proj-row">
-          <span>Dans {label}</span>
-          <span style="color:{color};font-weight:bold">{fmt_money(projected)}{trophy}</span>
-        </div>"""
+    rate_options = "".join(
+        f'<option value="{p}" {"selected" if p == 3 else ""}>{p} %</option>'
+        for p in range(1, 31)
+    )
 
     body = f"""
 <div class="card">
@@ -206,7 +189,7 @@ def render_dashboard(conn):
   <div style="text-align:center;color:#aaa;margin:6px 0">sur {fmt_money(GOAL)} — {pct:.2f}%</div>
   <div class="progress-wrap"><div class="progress-bar" style="width:{pct}%"></div></div>
   <div style="text-align:center;color:#aaa;font-size:13px">Reste : <span class="orange">{fmt_money(reste)}</span></div>
-  {eta_html}
+  <div class="eta" id="eta">…</div>
 </div>
 <div class="card">
   <h2>💳 Versements mensuels</h2>
@@ -217,9 +200,64 @@ def render_dashboard(conn):
   {vehicles_html}
 </div>
 <div class="card">
-  <h2>📈 Projections (avec versements actuels)</h2>
-  {projections}
-</div>"""
+  <h2>📈 Projections (intérêts composés)</h2>
+  <label class="small">Rendement annuel</label>
+  <select id="rate" onchange="recompute()">{rate_options}</select>
+  <div id="proj"></div>
+</div>
+<script>
+  var TOTAL={total}, MONTHLY={monthly}, GOAL={GOAL};
+  function fmtMoney(a){{
+    var sign = a<0 ? '-' : '';
+    a = Math.abs(a).toFixed(2).split('.');
+    return sign + a[0].replace(/\\B(?=(\\d{{3}})+(?!\\d))/g,' ') + ',' + a[1] + ' €';
+  }}
+  function futureValue(p, pmt, ratePct, months){{
+    if(ratePct<=0) return p + pmt*months;
+    var i = ratePct/100/12;
+    var g = Math.pow(1+i, months);
+    return p*g + pmt*((g-1)/i);
+  }}
+  function monthsToGoal(p, pmt, ratePct, goal){{
+    if(p>=goal) return 0;
+    if(ratePct<=0) return pmt>0 ? (goal-p)/pmt : Infinity;
+    var i = ratePct/100/12;
+    var base = p + pmt/i;
+    if(base<=0) return Infinity;
+    var target = (goal + pmt/i)/base;
+    if(target<=1) return Infinity;
+    return Math.log(target)/Math.log(1+i);
+  }}
+  function recompute(){{
+    var rate = parseInt(document.getElementById('rate').value);
+    // ETA
+    var m = monthsToGoal(TOTAL, MONTHLY, rate, GOAL);
+    var eta = document.getElementById('eta');
+    if(TOTAL>=GOAL){{ eta.textContent = '🎉 Objectif atteint !'; }}
+    else if(!isFinite(m)){{ eta.textContent = '⏱ Configurez vos versements mensuels'; }}
+    else {{
+      var yrs = m/12;
+      eta.textContent = yrs>=2
+        ? '⏱ ~'+yrs.toFixed(1)+' ans ('+Math.round(m)+' mois) à '+rate+'% de rendement'
+        : '⏱ ~'+Math.round(m)+' mois à '+rate+'% de rendement';
+    }}
+    // Projections
+    var rows = [['1 an',12],['5 ans',60],['10 ans',120],['20 ans',240]];
+    var html = '';
+    for(var k=0;k<rows.length;k++){{
+      var months = rows[k][1];
+      var fv = futureValue(TOTAL, MONTHLY, rate, months);
+      var gains = fv - (TOTAL + MONTHLY*months);
+      var color = fv>=GOAL ? '#56d364' : '#f0883e';
+      var trophy = fv>=GOAL ? ' 🏆' : '';
+      html += '<div class="proj-row"><span>Dans '+rows[k][0]
+            + '<br><span style="color:#777;font-size:10px">dont +'+fmtMoney(gains)+' d\\'intérêts</span></span>'
+            + '<span style="color:'+color+';font-weight:bold">'+fmtMoney(fv)+trophy+'</span></div>';
+    }}
+    document.getElementById('proj').innerHTML = html;
+  }}
+  recompute();
+</script>"""
     return page("Bilan — Épargne 1M", "dashboard", body)
 
 
