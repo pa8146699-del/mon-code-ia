@@ -1,16 +1,18 @@
 #!/usr/bin/env python3
-"""AgentOS — assistant style Jarvis qui AGIT sur ta base de données.
+"""AgentOS — cerveau numérique style Jarvis qui SAIT et qui AGIT.
 
-À la différence de jarvis/ (qui ne fait que discuter), cet agent utilise le
-« tool use » de Claude : il lit et écrit réellement dans la base SQLite
+À la différence de jarvis/ (qui ne fait que discuter), cet agent combine deux
+casquettes : il répond à TOUT (culture générale, calculs, conseils…) ET il
+utilise le « tool use » pour lire/écrire réellement dans la base SQLite
 (clients, projets, tâches, finances, notes) — ta source unique de vérité.
 
     python agentos/agent.py            # mode texte (terminal)
     python agentos/agent.py --voice    # mode vocal (micro + synthèse)
 
-Nécessite ANTHROPIC_API_KEY. Zéro dépendance externe en mode texte (l'appel
-API passe par urllib via llm.py). La synchro Notion (optionnelle) s'active via
-les variables NOTION_* (voir notion_sync.py).
+Moteur par défaut : Groq (GRATUIT, GROQ_API_KEY). Bascule via AGENTOS_PROVIDER
+(gemini / anthropic). Zéro dépendance externe en mode texte (l'appel API passe
+par urllib via llm.py). La synchro Notion (optionnelle) s'active via les
+variables NOTION_* (voir notion_sync.py).
 """
 
 import sys
