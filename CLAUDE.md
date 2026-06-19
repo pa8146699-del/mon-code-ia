@@ -7,13 +7,14 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 `mon-code-ia` is a personal Python toolkit with these components:
 
 - `jarvis/` — a vocal/text assistant powered by the Claude API (chat only).
-- `agentos/` — an "Agent OS": a Claude agent that uses **tool use** to read/write a central SQLite database (the single source of truth) across five domains, with optional Notion mirroring. Stdlib-only (the Claude API call goes through `urllib`, not the SDK).
+- `agentos/` — an "Agent OS": a Claude-compatible agent that uses **tool use** to read/write a central SQLite database (the single source of truth) across five domains, with optional Notion mirroring. Stdlib-only; supports Groq (free, default), Gemini, or Anthropic as LLM backends.
 - `agentmobile/` — a Kivy GUI (Android) front-end for AgentOS: a chat that drives the agent against a local SQLite DB on the phone. Reuses `agentos/`'s modules; its own APK build.
 - `dataguard/` — a command-line data-leak / phishing security toolkit (no external dependencies).
 - `mobile/` — a Kivy GUI wrapper around DataGuard, built into an Android APK by GitHub Actions.
 - `monappli/` — a second, personal Kivy security app reusing DataGuard, with its own combined "Tout analyser" action and its own APK build.
+- `savings/` — a savings-goal tracker (1 000 000 EUR target) with a Kivy mobile app and a stdlib web app for Termux/browser use.
 
-`jarvis/`, `agentos/`, and `dataguard/` share no code with each other. Reuse-via-copy (single source of truth stays in the origin folder, copies are git-ignored & created at build time):
+`jarvis/`, `agentos/`, `dataguard/`, and `savings/` share no code with each other. Reuse-via-copy (single source of truth stays in the origin folder, copies are git-ignored & created at build time):
 - `mobile/` reuses `dataguard/detectors.py` + `dataguard/phishing.py`.
 - `monappli/` reuses those two plus `dataguard/toolkit.py`.
 - `agentmobile/` reuses `agentos/db.py`, `tools.py`, `notion_sync.py`, `llm.py`.
@@ -25,7 +26,8 @@ mon-code-ia/
 ├── .github/workflows/
 │   ├── build-apk.yml                 # CI: mobile/ Android APK builder
 │   ├── build-monappli.yml            # CI: monappli/ Android APK builder
-│   └── build-agentmobile.yml         # CI: agentmobile/ Android APK builder
+│   ├── build-agentmobile.yml         # CI: agentmobile/ Android APK builder
+│   └── build-savings.yml             # CI: savings/ Android APK builder
 ├── .gitignore
 ├── CLAUDE.md
 ├── README.md
@@ -34,8 +36,8 @@ mon-code-ia/
 │   └── requirements.txt
 ├── agentos/
 │   ├── db.py                         # SQLite schema + CRUD (single source of truth)
-│   ├── tools.py                      # Claude tool-use definitions + dispatch()
-│   ├── llm.py                        # Claude API client + agent loop (stdlib urllib)
+│   ├── tools.py                      # 13 tool-use definitions + dispatch()
+│   ├── llm.py                        # Multi-provider agent loop (stdlib urllib)
 │   ├── agent.py                      # Jarvis-style terminal/voice front-end
 │   ├── notion_sync.py                # Best-effort Notion mirror (stdlib urllib)
 │   ├── test_agentos.py               # Tests (db + dispatch, no API calls)
@@ -57,19 +59,30 @@ mon-code-ia/
 │   ├── main.py                       # Personal Kivy GUI (adds "Tout analyser")
 │   ├── buildozer.spec                # Android build config
 │   └── README.md
-└── agentmobile/
-    ├── main.py                       # Kivy chat GUI driving the AgentOS agent
-    ├── buildozer.spec                # Android build config
-    └── README.md
+├── agentmobile/
+│   ├── main.py                       # Kivy chat GUI driving the AgentOS agent
+│   ├── buildozer.spec                # Android build config
+│   └── README.md
+└── savings/
+    ├── main.py                       # Kivy savings-tracker app
+    ├── web_app.py                    # stdlib HTTP server version (Termux/browser)
+    └── buildozer.spec                # Android build config (package: epargne1m)
 ```
 
-Files git-ignored under `mobile/`: `detectors.py`, `phishing.py`, `bin/`, `.buildozer/`, `*.apk`. Under `monappli/`: same plus `toolkit.py`. Under `agentmobile/`: `db.py`, `tools.py`, `notion_sync.py`, `llm.py`, `*.db`, `bin/`, `.buildozer/`.
+Files git-ignored under `mobile/`: `detectors.py`, `phishing.py`, `bin/`, `.buildozer/`, `*.apk`. Under `monappli/`: same plus `toolkit.py`. Under `agentmobile/`: `db.py`, `tools.py`, `notion_sync.py`, `llm.py`, `*.db`, `bin/`, `.buildozer/`. Under `savings/`: `savings.db`, `bin/`, `.buildozer/`.
 
 ## Setup
 
 ```bash
+# Jarvis only (uses anthropic SDK):
 pip install -r jarvis/requirements.txt
 export ANTHROPIC_API_KEY=your-key-here
+
+# AgentOS text mode — zero dependencies, Groq is the free default:
+export GROQ_API_KEY=your-free-key    # from console.groq.com
+# or switch providers:
+# export AGENTOS_PROVIDER=gemini  && export GEMINI_API_KEY=...
+# export AGENTOS_PROVIDER=anthropic && export ANTHROPIC_API_KEY=...
 ```
 
 ## Running Jarvis
@@ -92,15 +105,12 @@ python jarvis/jarvis.py --voice  # voice mode (microphone + speech synthesis)
 
 ## AgentOS Architecture
 
-`agentos/` is an "Agent OS": unlike `jarvis/` (chat only), the agent uses
-Claude **tool use** to actually read and write a central database — the single
-source of truth — across five domains: **clients, projets, taches, finances,
-notes**. Run it like Jarvis:
+`agentos/` is an "Agent OS": unlike `jarvis/` (chat only), the agent uses **tool use** to actually read and write a central database — the single source of truth — across five domains: **clients, projets, taches, finances, notes**. Run it like Jarvis:
 
 ```bash
 # Text mode needs NO pip install (pure stdlib). --voice needs the voice deps:
 pip install -r agentos/requirements.txt   # only for --voice
-export ANTHROPIC_API_KEY=your-key
+export GROQ_API_KEY=your-free-key         # default provider (free)
 python agentos/agent.py            # text mode
 python agentos/agent.py --voice    # voice mode (micro + speech)
 ```
@@ -108,10 +118,22 @@ python agentos/agent.py --voice    # voice mode (micro + speech)
 Flat module layout (imported by bare name, `agentos/` is on `sys.path[0]` when run directly):
 
 - `db.py` — **SQLite, stdlib only** (`sqlite3`). The source of truth. Schema in `SCHEMA`; `connect(path)` creates the file + schema (path from `AGENTOS_DB` env, default `agentos/agentos.db`). Tables: `clients`, `projets`, `taches`, `finances`, `notes`. Every write function (`add_*`, `update_*`) returns the created/modified row as a JSON-serializable dict. `finance_summary()` returns revenus/dépenses/solde + dépenses par catégorie.
-- `tools.py` — `TOOLS` is the list of tool definitions sent to the Claude API. `dispatch(conn, name, args)` runs the requested tool against the DB via `_HANDLERS`, fires a best-effort Notion sync for write tools (`_SYNC_TABLE`), and returns a JSON string. **All tool errors are caught and returned as `{"erreur": ...}`** so a bad call surfaces to Claude instead of crashing the loop. Add a tool = a `db.py` function + a `TOOLS` entry + a `_HANDLERS` branch (+ `_SYNC_TABLE`/`_DB_ENV` for Notion).
-- `llm.py` — **the shared agent loop, stdlib only**. Calls the Claude Messages API directly via `urllib` (no `anthropic` SDK — keeps the Android APK light and the package dependency-free). `run_turn(conn, history, user_message, api_key=None, on_tool=None)` mutates `history` in place (plain JSON-compatible dicts), loops on `stop_reason == "tool_use"` executing tools and feeding `tool_result` blocks back, and returns the final text. Model `claude-fable-5` (the `_MODEL` constant), `max_tokens=1024`, French `SYSTEM` prompt. API/network errors are returned as a string, not raised. The key comes from `api_key` or `ANTHROPIC_API_KEY`. **Both `agent.py` and `agentmobile/` call this** — it is the one place the agent logic lives.
-- `agent.py` — thin terminal/voice front-end, **same conventions as `jarvis/jarvis.py`** (module-level `VOICE_MODE`, conditional voice imports, `_history` global, same exit keywords). It delegates the actual turn to `llm.run_turn`, passing an `on_tool` callback that prints each tool call.
+- `tools.py` — `TOOLS` is the list of **13 tool definitions** sent to the LLM. `dispatch(conn, name, args)` runs the requested tool against the DB via `_HANDLERS`, fires a best-effort Notion sync for write tools (`_SYNC_TABLE`), and returns a JSON string. **All tool errors are caught and returned as `{"erreur": ...}`** so a bad call surfaces to Claude instead of crashing the loop. Add a tool = a `db.py` function + a `TOOLS` entry + a `_HANDLERS` branch (+ `_SYNC_TABLE` for Notion).
+- `llm.py` — **the shared multi-provider agent loop, stdlib only**. Calls the LLM API directly via `urllib` (no SDK — keeps the Android APK light and the package dependency-free). Three backend implementations: `_run_openai()` (used for Groq's OpenAI-compatible API), `_run_gemini()`, `_run_anthropic()`. Selected by the `AGENTOS_PROVIDER` env var (default: `groq`). `run_turn(conn, history, user_message, api_key=None, on_tool=None)` mutates `history` in place (plain JSON-compatible dicts), loops on `stop_reason == "tool_use"` executing tools and feeding `tool_result` blocks back, and returns the final text. `max_tokens=1024`, French `SYSTEM` prompt. API/network errors are returned as a string, not raised. **Both `agent.py` and `agentmobile/` call this** — it is the one place the agent logic lives.
+- `agent.py` — thin terminal/voice front-end, **same conventions as `jarvis/jarvis.py`** (module-level `VOICE_MODE`, conditional voice imports, `_history` global, same exit keywords). It delegates the actual turn to `llm.run_turn`, passing an `on_tool` callback that prints `[outil] name(args)` for each tool call.
 - `notion_sync.py` — the **hybrid** layer. `sync_row(table, row)` mirrors a row to Notion via stdlib `urllib` (no SDK). **Best-effort and never raises**: a no-op returning `False` if `NOTION_TOKEN` or the per-table `NOTION_DB_*` env var is missing; network/API errors are caught and logged. The row's title field becomes the page title; full JSON goes in a code block in the page body (so no Notion schema constraints apply). SQLite stays the source of truth; Notion is just a mobile-readable mirror.
+
+### LLM Provider Selection
+
+`AGENTOS_PROVIDER` env var (default: `groq`):
+
+| Provider | Env var | Notes |
+|---|---|---|
+| `groq` (default) | `GROQ_API_KEY` | Free tier at console.groq.com; OpenAI-compatible |
+| `gemini` | `GEMINI_API_KEY` | Google Gemini API |
+| `anthropic` | `ANTHROPIC_API_KEY` | Anthropic Claude API |
+
+The API call is always made via `urllib` (no SDK) regardless of provider.
 
 Notion config (all optional env vars): `NOTION_TOKEN`, `NOTION_DB_{CLIENTS,PROJETS,TACHES,FINANCES,NOTES}`, `NOTION_TITLE_PROP` (default `"Name"`).
 
@@ -122,7 +144,7 @@ python -m pytest agentos/                 # if pytest is installed
 cd agentos && python test_agentos.py      # zero-dependency fallback runner
 ```
 
-11 tests covering DB CRUD round-trips, status filtering, project/task linkage, `finance_summary`, note search, and tool `dispatch` (including unknown-tool and error-propagation paths). **No test calls the Claude API or Notion** — they exercise `db` and `tools.dispatch` directly against a `tmp_path` SQLite file. Same zero-dep runner pattern as `dataguard/test_dataguard.py` (`tmp_path` via `tempfile.TemporaryDirectory`).
+11 tests covering DB CRUD round-trips, status filtering, project/task linkage, `finance_summary`, note search, and tool `dispatch` (including unknown-tool and error-propagation paths). **No test calls the LLM API or Notion** — they exercise `db` and `tools.dispatch` directly against a `tmp_path` SQLite file. Same zero-dep runner pattern as `dataguard/test_dataguard.py` (`tmp_path` via `tempfile.TemporaryDirectory`).
 
 The local DB (`agentos/*.db`) is git-ignored.
 
@@ -226,14 +248,9 @@ Build:
 
 ## MonAppli (`monappli/`)
 
-`monappli/main.py` is a personal, full **cybersecurity toolbox** — a Kivy app
-that exposes everything DataGuard can do for touch use. It follows the same
-conventions as `mobile/` (imports the security modules by bare name; they are
-copied in at build time and git-ignored) but reuses **three** modules —
-`detectors`, `phishing`, and `toolkit` — instead of two, and is wider in scope.
+`monappli/main.py` is a personal, full **cybersecurity toolbox** — a Kivy app that exposes everything DataGuard can do for touch use. It follows the same conventions as `mobile/` (imports the security modules by bare name; they are copied in at build time and git-ignored) but reuses **three** modules — `detectors`, `phishing`, and `toolkit` — instead of two, and is wider in scope.
 
-Six tools, laid out in a 2-column `GridLayout`, all operating on the single
-shared `TextInput`:
+Six tools, laid out in a 2-column `GridLayout`, all operating on the single shared `TextInput`:
 
 | Button | Handler | Backed by |
 |---|---|---|
@@ -246,72 +263,76 @@ shared `TextInput`:
 
 Conventions specific to `monappli/`:
 
-- Report colours live in module-level `SEVERITY_COLORS` / `RISK_COLORS` /
-  `PASSWORD_COLORS` dicts (not inline as in `mobile/main.py`).
-- `_esc()` escapes Kivy markup metacharacters (`[`, `]`, `&`) before any
-  user-supplied or generated string (e.g. generated passwords, redacted
-  excerpts) is rendered with `markup=True`. **Always escape dynamic text shown
-  in a markup Label** — generated passwords routinely contain `[`/`]`/`&`.
+- Report colours live in module-level `SEVERITY_COLORS` / `RISK_COLORS` / `PASSWORD_COLORS` dicts (not inline as in `mobile/main.py`).
+- `_esc()` escapes Kivy markup metacharacters (`[`, `]`, `&`) before any user-supplied or generated string (e.g. generated passwords, redacted excerpts) is rendered with `markup=True`. **Always escape dynamic text shown in a markup Label** — generated passwords routinely contain `[`/`]`/`&`.
 
-Build/test mirrors `mobile/`: the `Build APK MonAppli` workflow triggers on
-`workflow_dispatch` or pushes to `main` touching `monappli/**` (or its workflow
-file), and copies `dataguard/{detectors,phishing,toolkit}.py` in. Local UI test:
-`pip install kivy`, copy the three modules in, then `python monappli/main.py`.
+Build/test mirrors `mobile/`: the `Build APK MonAppli` workflow triggers on `workflow_dispatch` or pushes to `main` touching `monappli/**` (or its workflow file), and copies `dataguard/{detectors,phishing,toolkit}.py` in. Local UI test: `pip install kivy`, copy the three modules in, then `python monappli/main.py`.
 
-When adding further reuse apps, follow this same template: a new folder, a
-`buildozer.spec` with a unique `package.name`, a matching workflow that copies
-the needed origin `*.py` modules in, and matching `.gitignore` entries.
+When adding further reuse apps, follow this same template: a new folder, a `buildozer.spec` with a unique `package.name`, a matching workflow that copies the needed origin `*.py` modules in, and matching `.gitignore` entries.
 
 ## AgentMobile (`agentmobile/`)
 
-`agentmobile/main.py` is the **Android front-end for AgentOS**: a Kivy chat UI
-that drives the agent against a **local SQLite DB on the phone**. It follows the
-`mobile/`/`monappli/` template but reuses **AgentOS** modules (copied at build
-time, git-ignored): `agentos/{db,tools,notion_sync,llm}.py`.
+`agentmobile/main.py` is the **Android front-end for AgentOS**: a Kivy chat UI that drives the agent against a **local SQLite DB on the phone**. It follows the `mobile/`/`monappli/` template but reuses **AgentOS** modules (copied at build time, git-ignored): `agentos/{db,tools,notion_sync,llm}.py`.
 
 Key points specific to `agentmobile/`:
 
-- **No paid third-party service** — fully free. The only metered cost is Claude
-  API usage (per-token, no subscription); the user pastes their key into a
-  password `TextInput` (pre-filled from `ANTHROPIC_API_KEY` for desktop tests).
-- **Calls Claude via `llm.run_turn`** (urllib, no SDK), so `requirements` stays
-  `python3,kivy` — the APK builds without bundling `anthropic`/`httpx`/`pydantic`.
-- **DB path is `App.user_data_dir`** (writable on Android), passed to
-  `db.connect(...)` — not the repo-relative default.
-- **Network call runs on a background `threading.Thread`**; UI updates marshalled
-  back via `Clock.schedule_once`. The `on_tool` callback shows each tool fired.
+- **No paid third-party service required** — Groq (the default provider in `llm.py`) offers a free tier. The user pastes their API key into a password `TextInput` (pre-filled from `GROQ_API_KEY` or `ANTHROPIC_API_KEY` for desktop tests).
+- **Calls the LLM via `llm.run_turn`** (urllib, no SDK), so `requirements` stays `python3,kivy` — the APK builds without bundling `anthropic`/`httpx`/`pydantic`.
+- **DB path is `App.user_data_dir`** (writable on Android), passed to `db.connect(...)` — not the repo-relative default.
+- **Network call runs on a background `threading.Thread`**; UI updates marshalled back via `Clock.schedule_once`. The `on_tool` callback shows each tool fired.
 - `_esc()` escapes Kivy markup metacharacters before rendering replies.
 - `buildozer.spec` adds `android.permissions = INTERNET`.
 
-Build/test mirrors the others: the `Build APK AgentMobile` workflow triggers on
-`workflow_dispatch` or pushes to `main` touching `agentmobile/**` (or its
-workflow file), and copies `agentos/{db,tools,notion_sync,llm}.py` in. Local UI
-test: `pip install kivy`, copy the four modules in, then `python agentmobile/main.py`.
+Build/test mirrors the others: the `Build APK AgentMobile` workflow triggers on `workflow_dispatch` or pushes to `main` touching `agentmobile/**` (or its workflow file), and copies `agentos/{db,tools,notion_sync,llm}.py` in. Local UI test: `pip install kivy`, copy the four modules in, then `python agentmobile/main.py`.
+
+## Savings (`savings/`)
+
+`savings/` is a **savings-goal tracker** targeting 1 000 000 EUR via monthly contributions to three investment vehicles (Assurance Vie, PER, PEL). Two interfaces share the same SQLite schema:
+
+- `savings/main.py` — Kivy GUI (Android APK via `build-savings.yml`). Progress bar toward goal, per-vehicle list with current totals, monthly entry form.
+- `savings/web_app.py` — stdlib HTTP server (`http.server`, port 8080) for Termux or desktop browsers. Serves an HTML UI with inline CSS; no external web framework.
+
+Both share:
+- **SQLite DB** (`savings/savings.db`, git-ignored) with two tables: `vehicles` (name, monthly_amount, current_total, color_idx) and `entries` (vehicle_id, year, month, amount, note, created_at).
+- Utility functions: `fmt_money()`, `future_value()` (monthly compounding), `months_to_goal()`, `hex_to_rgb()`.
+- **Zero external dependencies** — pure Python 3 stdlib (`sqlite3`, `http.server`) + `kivy` only for `main.py`.
+
+```bash
+pip install kivy
+python savings/main.py          # Kivy desktop/mobile UI
+
+python savings/web_app.py       # starts HTTP server on http://localhost:8080
+```
+
+Build:
+- The `Build APK Savings` workflow triggers on `workflow_dispatch` or push to `main` touching `savings/**`.
+- No module-copy step (savings/ has no reuse dependencies).
+- Artifact: `epargne1m-apk`.
+- `buildozer.spec` package name: `epargne1m`; adds `WRITE_EXTERNAL_STORAGE` + `READ_EXTERNAL_STORAGE` permissions.
 
 ## Dependencies
 
 | Package | Required for |
 |---|---|
 | `anthropic>=0.40.0` | Claude API client — required by `jarvis/` only |
-| `SpeechRecognition>=3.10.0` | Microphone → text (`--voice` only) |
+| `SpeechRecognition>=3.10.0` | Microphone → text (`--voice` only, jarvis + agentos) |
 | `pyttsx3>=2.90` | Text → speech, offline (`--voice` only) |
 | `PyAudio>=0.2.14` | Audio I/O backend for SpeechRecognition (`--voice` only) |
-| `kivy` | `mobile/`, `monappli/`, `agentmobile/` GUIs (provided by the Buildozer CI image; `pip install kivy` for local UI tests) |
+| `kivy` | `mobile/`, `monappli/`, `agentmobile/`, `savings/` GUIs (provided by the Buildozer CI image; `pip install kivy` for local UI tests) |
 
-`agentos/` has **zero external dependencies** in text mode — it calls the Claude
-API through `urllib` (`llm.py`) and stores data in `sqlite3`; only `--voice` adds
-the voice packages. `dataguard/` has **zero external dependencies** (pure Python 3
-stdlib: `re`, `pathlib`, `subprocess`, `argparse`, `json`, `dataclasses`, `html`,
-`datetime`, `stat`, plus `hashlib`, `secrets`, `math`, `string` for `toolkit.py`).
+`agentos/` has **zero external dependencies** in text mode — it calls the LLM API through `urllib` (`llm.py`) and stores data in `sqlite3`; only `--voice` adds the voice packages. `dataguard/` and `savings/` have **zero external dependencies** (pure Python 3 stdlib).
 
 ## Key Architectural Decisions
 
 - **Modular separation + reuse-via-copy**: components are independent; the Kivy apps reuse a core folder by copying its modules at build time (not importing), keeping the core the single source of truth — `mobile/`+`monappli/` from `dataguard/`, `agentmobile/` from `agentos/`.
-- **SDK-free Claude calls in agentos**: `agentos/llm.py` talks to the Messages API via `urllib` instead of the `anthropic` SDK. This keeps the package stdlib-only and lets `agentmobile/` build an APK with just `python3,kivy` (no `httpx`/`pydantic` to cross-compile). `jarvis/` still uses the SDK.
-- **Conditional voice loading**: jarvis imports audio libs only when `--voice` is present, avoiding dependency failures for text-only mode.
+- **Multi-provider, SDK-free LLM calls in agentos**: `agentos/llm.py` supports Groq (free, default), Gemini, and Anthropic via `urllib` instead of any SDK. This keeps the package stdlib-only and lets `agentmobile/` build an APK with just `python3,kivy`. `jarvis/` still uses the `anthropic` SDK since it only targets desktop.
+- **Groq as default**: AgentOS and AgentMobile default to Groq (free tier). Switch via `AGENTOS_PROVIDER=anthropic|gemini`.
+- **Conditional voice loading**: jarvis and agentos import audio libs only when `--voice` is present, avoiding dependency failures for text-only mode.
 - **Luhn validation**: credit card regex matches are verified by the Luhn checksum to suppress false positives.
 - **Redaction-first**: secrets are masked (`a***34`) before any display or logging; raw values never appear in output.
 - **CI-only APK builds**: Buildozer requires Android SDK/NDK; the GitHub Actions container provides both; local builds are not supported.
 - **No persistent state in jarvis**: `_history` lives only in memory for the process lifetime; there is no database or file backing. (AgentOS, by contrast, persists everything to SQLite.)
-- **AgentOS acts, it doesn't just chat**: where jarvis only converses, agentos gives Claude tools that mutate a SQLite DB — the "single source of truth". The UI is for humans to pilot; the AI uses the data to do real work (categorize an expense, fill a CRM card, track tasks).
+- **AgentOS acts, it doesn't just chat**: where jarvis only converses, agentos gives the LLM tools that mutate a SQLite DB — the "single source of truth". The UI is for humans to pilot; the AI uses the data to do real work (categorize an expense, fill a CRM card, track tasks).
 - **SQLite as source of truth, Notion as mirror**: the hybrid design keeps the authoritative data local in SQLite; Notion sync is optional, best-effort, and never blocks or crashes the agent if unconfigured or offline.
+- **Tool errors surface to the LLM**: all errors in `tools.dispatch()` are caught and returned as `{"erreur": ...}` JSON strings so the LLM sees what went wrong and can correct its next call, rather than crashing the loop.
+- **Zero-dependency test runners**: both `agentos/test_agentos.py` and `dataguard/test_dataguard.py` ship their own fallback runner (no pytest required) using `tempfile.TemporaryDirectory` for `tmp_path`.
