@@ -12,6 +12,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - `dataguard/` — a command-line data-leak / phishing security toolkit (no external dependencies).
 - `mobile/` — a Kivy GUI wrapper around DataGuard, built into an Android APK by GitHub Actions.
 - `monappli/` — a second, personal Kivy security app reusing DataGuard, with its own combined "Tout analyser" action and its own APK build.
+- `termux/` — install/launch shell scripts to run the `dataguard/` toolkit on Android via Termux (no APK, no pip — it's a pure-stdlib CLI). `install.sh` installs `python`+`git`, clones the repo, and drops a `dataguard` launcher in `$PREFIX/bin`; `update.sh` is a `git pull` wrapper.
 
 `jarvis/`, `agentos/`, and `dataguard/` share no code with each other. Reuse-via-copy (single source of truth stays in the origin folder, copies are git-ignored & created at build time):
 - `mobile/` reuses `dataguard/detectors.py` + `dataguard/phishing.py`.
