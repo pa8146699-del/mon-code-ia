@@ -53,6 +53,47 @@ bash ~/mon-code-ia/termux/update.sh
 
 (équivaut à un `git pull` dans le dépôt).
 
+---
+
+## 🐧 Environnement à contrôle complet (Debian dans Termux)
+
+⚠️ **N'installe PAS Termux depuis le Play Store** : cette version est gelée et
+bridée (paquets bloqués). Installe la vraie version, complète et non
+restreinte, depuis :
+
+- **F-Droid** : <https://f-droid.org/packages/com.termux/>
+- **GitHub Releases** : <https://github.com/termux/termux-app/releases>
+
+Pour un **contrôle total** (apt complet, n'importe quel paquet, ton propre
+`$HOME`, sans root), installe un vrai Linux Debian *à l'intérieur* de Termux
+via `proot-distro` :
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/pa8146699-del/mon-code-ia/main/termux/setup-distro.sh | bash
+```
+
+Le script :
+1. installe `proot-distro` ;
+2. installe **Debian** (rootfs complet) ;
+3. y installe `python3` + `git`, clone le dépôt et pose la commande
+   `dataguard` dans `/usr/local/bin` ;
+4. crée le raccourci `debian-cyber` côté Termux pour entrer dans ce Linux.
+
+Ensuite :
+
+```bash
+debian-cyber                  # entre dans ton Debian (contrôle complet)
+# … à l'intérieur :
+dataguard                     # la boîte à outils
+apt install <ce-que-tu-veux>  # apt complet, rien n'est bridé
+```
+
+> **Choix de la distro** : Debian est le défaut recommandé (stable, léger, non
+> restreint). `proot-distro` sait aussi installer `ubuntu`, `archlinux` ou
+> `kali-linux` — remplace la variable `DISTRO` en haut de `setup-distro.sh`
+> pour en changer. N'utilise des outils offensifs que sur des cibles que tu es
+> **autorisé** à tester.
+
 ## Que détecte DataGuard ?
 
 - **Secrets / fuites** : clés privées, clés API (AWS, Anthropic, OpenAI,
