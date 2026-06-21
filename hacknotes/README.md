@@ -50,3 +50,23 @@ python hacknotes/main.py
 
 La base SQLite est créée au premier lancement dans le dossier de données de
 l'app.
+
+## Version CLI (terminal — Termux/Kali)
+
+`notes_cli.py` est le jumeau **ligne de commande** de l'app graphique, en
+**stdlib pure** (zéro `pip`, zéro `kivy`) — idéal pour Termux/Kali où afficher
+une fenêtre Kivy est compliqué. Même schéma SQLite.
+
+Base : `$HACKNOTES_DB` si défini, sinon `~/.hacknotes.db` (persiste partout).
+
+```bash
+python hacknotes/notes_cli.py add "Lab IDOR" Lab "curl -A Mozilla -b cookie ..."
+python hacknotes/notes_cli.py list
+python hacknotes/notes_cli.py search agoda
+python hacknotes/notes_cli.py view 1
+python hacknotes/notes_cli.py edit 1 "Lab IDOR v2" Lab "maj du contenu"
+python hacknotes/notes_cli.py del 1
+```
+
+Catégories colorées en ANSI : `Lab` (vert), `Cible`/`Faille` (rouge),
+`Technique` (bleu), `Recon` (magenta), libre (gris).
