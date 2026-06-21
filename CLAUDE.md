@@ -12,6 +12,8 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - `dataguard/` — a command-line data-leak / phishing security toolkit (no external dependencies).
 - `mobile/` — a Kivy GUI wrapper around DataGuard, built into an Android APK by GitHub Actions.
 - `monappli/` — a second, personal Kivy security app reusing DataGuard, with its own combined "Tout analyser" action and its own APK build.
+- `termux/` — install/launch shell scripts to run the `dataguard/` toolkit on Android via Termux (no APK, no pip — it's a pure-stdlib CLI). `install.sh` installs `python`+`git`, clones the repo, and drops a `dataguard` launcher in `$PREFIX/bin`; `update.sh` is a `git pull` wrapper.
+- `netscan/` — a Kivy GUI (Android) network/port scanner: TCP-connect scan (no root) of a `/24` subnet or a single host. **Self-contained** (stdlib `socket`/`threading` + Kivy) — reuses no other module, so nothing is copied at build time. Its own APK build.
 
 `jarvis/`, `agentos/`, and `dataguard/` share no code with each other. Reuse-via-copy (single source of truth stays in the origin folder, copies are git-ignored & created at build time):
 - `mobile/` reuses `dataguard/detectors.py` + `dataguard/phishing.py`.
@@ -287,6 +289,28 @@ Build/test mirrors the others: the `Build APK AgentMobile` workflow triggers on
 `workflow_dispatch` or pushes to `main` touching `agentmobile/**` (or its
 workflow file), and copies `agentos/{db,tools,notion_sync,llm}.py` in. Local UI
 test: `pip install kivy`, copy the four modules in, then `python agentmobile/main.py`.
+
+## NetScan (`netscan/`)
+
+`netscan/main.py` is a Kivy GUI **network/port scanner** for Android. Unlike the
+other Kivy apps it **reuses nothing** — it is fully self-contained (stdlib
+`socket` + `threading` + Kivy), so its workflow has **no copy step**.
+
+- **TCP-connect scan** (`socket.connect_ex`, like `nmap -sT`): works **without
+  root**, so it runs in a normal APK.
+- Two modes: **🌐 Scanner le réseau** (sweeps the 254 hosts of a `/24`, 100
+  workers via `ThreadPoolExecutor`) and **🎯 Scanner un hôte** (all common ports
+  of one IP). `COMMON_PORTS` maps port→service name for the report.
+- `local_subnet()` auto-detects the `/24` prefix by opening a UDP socket toward
+  `8.8.8.8` and reading the local IP (no packet sent) — pre-fills the input.
+- The scan runs on a **background `threading.Thread`**; UI updates are marshalled
+  back via `Clock.schedule_once` (never touched from the thread). `_esc()`
+  escapes Kivy markup before rendering, same convention as `monappli/`.
+- `buildozer.spec` adds `android.permissions = INTERNET, ACCESS_NETWORK_STATE,
+  ACCESS_WIFI_STATE`. The `Build APK NetScan` workflow triggers on
+  `workflow_dispatch` or pushes to `main` touching `netscan/**`; it builds
+  directly (no module copy). Local UI test: `pip install kivy`, then
+  `python netscan/main.py`.
 
 ## Dependencies
 
