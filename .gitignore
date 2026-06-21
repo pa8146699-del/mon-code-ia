@@ -36,3 +36,9 @@ savings/bin/
 # Artéfacts de build de NetScan (appli autonome, rien à copier)
 netscan/.buildozer/
 netscan/bin/
+
+# HackNotes : base locale des notes (créée au 1er lancement) + build
+hacknotes/hacknotes.db
+hacknotes/*.db
+hacknotes/.buildozer/
+hacknotes/bin/
