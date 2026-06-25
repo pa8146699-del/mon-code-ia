@@ -1,0 +1,6 @@
+# Dépendances de monia/ (ton mini-GPT).
+# Installation CPU (carte Intel, pas de GPU NVIDIA) :
+#   pip install torch --index-url https://download.pytorch.org/whl/cpu
+#   pip install numpy
+torch
+numpy

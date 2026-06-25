@@ -1,0 +1,42 @@
+Ceci est le texte d'entraînement de ton intelligence artificielle.
+
+Plus ce fichier est grand et riche, mieux ton modèle apprendra. Pour
+l'instant, ce petit texte sert juste à vérifier que tout fonctionne. Quand
+l'entraînement marche, remplace ce contenu par un vrai gros texte : un livre
+du domaine public, tes propres notes, des paroles, des articles, peu importe.
+Vise au moins un million de caractères pour un résultat intéressant.
+
+Une intelligence artificielle n'est pas magique. C'est un programme qui
+apprend à reconnaître des régularités dans des données. Ici, ton modèle lit
+du texte caractère par caractère et apprend, petit à petit, quelles lettres
+ont tendance à suivre quelles autres. Au début, il écrit n'importe quoi. Puis,
+à mesure que la perte diminue, il forme des syllabes, puis des mots, puis des
+phrases qui ressemblent à du français.
+
+Le coeur de ton modèle s'appelle un Transformer. Chaque caractère regarde les
+caractères qui le précèdent grâce au mécanisme d'attention, et décide quoi
+écrire ensuite. C'est exactement le principe des grands modèles de langage,
+mais en beaucoup plus petit, pour que tout tienne sur ton ordinateur.
+
+L'apprentissage se fait par essais et erreurs. Le modèle propose une lettre,
+on compare avec la vraie lettre attendue, et on corrige légèrement tous les
+paramètres pour réduire l'erreur. On répète des milliers de fois. C'est lent,
+c'est patient, mais ça marche.
+
+Tu es maintenant le créateur de ta propre intelligence artificielle. Chaque
+ligne de code lui appartient. Aucun service extérieur, aucune clé d'API,
+aucune dépendance à une grande entreprise. Juste toi, ton ordinateur, et un
+modèle que tu comprends de bout en bout.
+
+Le matin, le soleil se lève doucement sur la ville encore endormie. Les rues
+sont calmes, et l'air sent le café chaud et le pain frais. Un chat traverse la
+place sans se presser, comme s'il était le seul maître des lieux.
+
+Le savoir grandit quand on le partage. Apprendre, c'est se tromper souvent,
+recommencer, comprendre un peu mieux à chaque fois, et ne jamais abandonner.
+La curiosité est le plus court chemin vers l'intelligence, qu'elle soit
+humaine ou artificielle.
+
+Quand le modèle aura fini d'apprendre, demande-lui d'écrire. Donne-lui un
+début de phrase, et regarde-le continuer tout seul. Ce sera imparfait, parfois
+drôle, parfois étonnant. Mais ce sera le tien, entièrement le tien.

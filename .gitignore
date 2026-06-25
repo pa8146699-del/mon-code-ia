@@ -36,3 +36,7 @@ savings/bin/
 # Artéfacts de build de NetScan (appli autonome, rien à copier)
 netscan/.buildozer/
 netscan/bin/
+
+# Artefacts de monia/ (modele entraine + cache)
+monia/monia.pt
+monia/__pycache__/
