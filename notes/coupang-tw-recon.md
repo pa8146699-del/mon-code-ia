@@ -87,3 +87,40 @@ Auth                             : id, mauth (failles login/compte)
 L'inscription Coupang TW peut demander un n° de téléphone taïwanais. Si bloqué :
 → tester les endpoints publics / le comportement des API non authentifiées,
    et les portails partenaires qui ont parfois une inscription ouverte.
+
+---
+
+## 📓 Journal de finding — marketplace.tw.coupangcorp.com (Salesforce)
+
+**Date :** 2026-06-26 · **Statut : TESTÉ → NON reportable en l'état**
+
+### Ce qui a été observé
+- `marketplace.tw.coupangcorp.com` = site **Salesforce Experience Cloud** (mode invité).
+- Endpoint Aura présent : `/tw/s/sfsites/aura` → HTTP 200.
+- Contexte invité extrait (fwuid, app `siteforce:communityApp`, `authenticated:false`).
+- Test minimal `getItems` sur l'objet **User** (pageSize 1, getCount) → `state:SUCCESS`,
+  `totalCount:1`.
+
+### Verdict honnête
+- Le seul enregistrement renvoyé = le **compte système du site** ("Taiwan_marketplace"),
+  avec **tous les champs perso à `null`** (Email, Phone, Username, Name perso...).
+- C'est le **comportement par défaut** d'un site Salesforce Community → exposer son
+  propre user système. **Ce n'est PAS une fuite de données client = NON reportable.**
+
+### Décision de chercheur (éthique en action)
+```
+- Une "porte ouverte" (API interrogeable) ≠ une faille. Il faut un IMPACT réel.
+- Pour confirmer un vrai bug, il faudrait voir si l'invité lit des objets avec de
+  VRAIES données client (Contact/Account/Case/__c). MAIS récupérer ces données =
+  violer la policy Coupang ("ne pas accéder/exfiltrer de données privées") + perte
+  du Safe Harbor. DONC on n'aspire PAS.
+- Méthode propre si on veut juger la sévérité sans exfiltrer : requêtes COUNT-only
+  (getCount) via l'outillage dédié, sur PC, pour montrer "l'invité peut compter N
+  Contacts" SANS lire leur contenu. Si un objet renvoie des données client en
+  volume → là seulement c'est un rapport.
+```
+
+### Leçon
+> Trouver l'endpoint = bien joué (vraie recon). Mais conclure honnêtement
+> "pas d'impact démontrable sans franchir la ligne → je passe" = ça, c'est un
+> chercheur sérieux. On ne force jamais au prix de la légalité/policy.
