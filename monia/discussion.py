@@ -132,6 +132,137 @@ class Discussion:
         chat.reseau.biais = etat["biais"]
         return chat
 
+    # -- Voir et effacer ce qu'elle a appris ---------------------------------
+
+    def lister(self):
+        """Renvoie la liste des couples (question, réponse) connus."""
+        return list(self._paires)
+
+    def oublier(self, question):
+        """Supprime les couples dont la question correspond (insensible à la casse).
+
+        Renvoie le nombre de couples supprimés, 0 si rien ne correspond, ou -1
+        si ça viderait toute la mémoire (refusé, il faut au moins une chose à savoir).
+        """
+        cible = question.strip().lower()
+        restantes = [p for p in self._paires if p[0].strip().lower() != cible]
+        supprimes = len(self._paires) - len(restantes)
+        if supprimes == 0:
+            return 0
+        if not restantes:
+            return -1
+        self._construire(restantes)
+        self.entrainer()
+        return supprimes
+
+
+# --- La voix (optionnelle, gratuite sur Termux) -----------------------------
+
+def parler(texte, actif):
+    """Lit le texte à voix haute via termux-tts-speak, si dispo et activé.
+
+    Silencieux et sans erreur si termux-tts-speak n'existe pas (ex : sur PC).
+    """
+    if not actif:
+        return
+    import shutil
+    import subprocess
+
+    exe = shutil.which("termux-tts-speak")
+    if not exe:
+        return
+    try:
+        subprocess.run([exe, texte], check=False)
+    except Exception:
+        pass
+
+
+# --- La boucle de chat partagée par tous les assistants ---------------------
+
+_EXTRA = (
+    "Commandes : aide | liste (voir ce que je sais) | "
+    "oublie: <question> | voix | quitter"
+)
+
+
+def boucle(chat, fichier, separateur="=", afficher=None, aide="", voix=False):
+    """Fait tourner une discussion interactive autour d'un objet Discussion.
+
+    chat       : un Discussion (déjà entraîné).
+    fichier    : où sauvegarder ce qu'on apprend en direct.
+    separateur : ce qui sépare question et réponse dans "apprends:" ("=" ou ">>>").
+    afficher   : fonction afficher(reponse) ; par défaut "MonIA : <reponse>".
+    aide       : texte d'aide propre à l'assistant.
+    voix       : True pour lire les réponses à voix haute (Termux).
+    """
+    if afficher is None:
+        def afficher(reponse):
+            print("MonIA : " + reponse)
+
+    print("Prêt ! " + aide + "\n" + _EXTRA)
+    if voix:
+        print("(voix activée — tape 'voix' pour la couper)")
+    print()
+
+    while True:
+        try:
+            phrase = input("Toi : ").strip()
+        except (EOFError, KeyboardInterrupt):
+            print("\nMonIA : Au revoir !")
+            break
+        bas = phrase.lower()
+
+        if bas in {"quitter", "stop", "exit", "quit"}:
+            print("MonIA : Au revoir !")
+            break
+        if not phrase:
+            continue
+        if bas in {"aide", "help", "?"}:
+            print("MonIA :\n" + aide + "\n" + _EXTRA)
+            continue
+        if bas in {"voix", "voice"}:
+            voix = not voix
+            print("MonIA : voix " + ("activée." if voix else "coupée."))
+            continue
+        if bas in {"liste", "list"}:
+            paires = chat.lister()
+            print(f"MonIA : je connais {len(paires)} chose(s) :")
+            for i, (question, _) in enumerate(paires, 1):
+                print(f"   {i}. {question}")
+            continue
+        if bas.startswith("oublie"):
+            cible = phrase.split(":", 1)[1].strip() if ":" in phrase else ""
+            if not cible:
+                print("MonIA : dis-moi quoi oublier :  oublie: la question exacte")
+                continue
+            n = chat.oublier(cible)
+            if n == -1:
+                print("MonIA : je ne peux pas tout oublier, il me faut au moins une chose à savoir.")
+            elif n == 0:
+                print("MonIA : je ne connais pas ça, rien à oublier.")
+            else:
+                chat.sauvegarder(fichier)
+                print(f"MonIA : c'est oublié ({n}).")
+            continue
+        if bas.startswith("apprends"):
+            corps = phrase.split(":", 1)[1] if ":" in phrase else ""
+            if separateur not in corps:
+                print(f"MonIA : Écris :  apprends: ta question {separateur} ta réponse")
+                continue
+            question, reponse = corps.split(separateur, 1)
+            question, reponse = question.strip(), reponse.strip()
+            if not question or not reponse:
+                print("MonIA : Il me faut une question ET une réponse.")
+                continue
+            chat.apprendre(question, reponse)
+            chat.sauvegarder(fichier)
+            print(f"MonIA : Appris ! « {question} »")
+            continue
+
+        reponse = chat.repondre(phrase)
+        afficher(reponse)
+        parler(reponse, voix)
+
 
 # --- Ce que l'IA sait au départ (apprends-lui-en plus !) --------------------
 # Ajoute tes propres couples ici : ("ta question", "sa réponse").
@@ -163,6 +294,10 @@ AIDE = (
 
 
 if __name__ == "__main__":
+    import sys
+
+    voix = "voix" in sys.argv
+
     # Si elle a déjà appris des choses la dernière fois, on les recharge.
     if os.path.exists(FICHIER):
         chat = Discussion.charger(FICHIER)
@@ -173,38 +308,4 @@ if __name__ == "__main__":
         chat.entrainer(epochs=3000, taux=0.3)
         chat.sauvegarder(FICHIER)
 
-    print("Prête ! " + AIDE + "\n")
-
-    while True:
-        try:
-            phrase = input("Toi : ").strip()
-        except (EOFError, KeyboardInterrupt):
-            print("\nMonIA : Au revoir !")
-            break
-
-        if phrase.lower() in {"quitter", "stop", "exit", "quit"}:
-            print("MonIA : Au revoir !")
-            break
-        if not phrase:
-            continue
-        if phrase.lower() in {"aide", "help", "?"}:
-            print("MonIA :\n" + AIDE)
-            continue
-
-        # Enseignement en direct : "apprends: question = réponse"
-        if phrase.lower().startswith("apprends"):
-            corps = phrase.split(":", 1)[1] if ":" in phrase else ""
-            if "=" not in corps:
-                print("MonIA : Dis-moi plutôt :  apprends: ta question = ma réponse")
-                continue
-            question, reponse = corps.split("=", 1)
-            question, reponse = question.strip(), reponse.strip()
-            if not question or not reponse:
-                print("MonIA : Il me faut une question ET une réponse.")
-                continue
-            chat.apprendre(question, reponse)
-            chat.sauvegarder(FICHIER)  # je le retiens pour la prochaine fois
-            print(f"MonIA : Compris ! Désormais à « {question} » je répondrai « {reponse} ».")
-            continue
-
-        print(f"MonIA : {chat.repondre(phrase)}")
+    boucle(chat, FICHIER, separateur="=", aide=AIDE, voix=voix)

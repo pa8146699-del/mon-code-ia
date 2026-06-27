@@ -15,7 +15,7 @@ Lancer :  python3 commandes.py
 
 import os
 
-from discussion import Discussion
+from discussion import Discussion, boucle
 
 FICHIER = os.path.join(os.path.dirname(__file__), "commandes.json")
 SEPARATEUR = ">>>"
@@ -74,6 +74,9 @@ COMMANDES = [
 
 def _afficher(reponse):
     """Affiche la commande (1re ligne) et son explication (le reste)."""
+    if "ne sais pas" in reponse.lower():
+        print("MonIA : " + reponse)
+        return
     lignes = reponse.split("\n")
     print("MonIA — la commande :")
     print("    $ " + lignes[0])
@@ -82,50 +85,17 @@ def _afficher(reponse):
 
 
 if __name__ == "__main__":
+    import sys
+
+    voix = "voix" in sys.argv
+
     if os.path.exists(FICHIER):
-        aide = Discussion.charger(FICHIER)
+        helper = Discussion.charger(FICHIER)
         print("J'ai rechargé toutes les commandes que je connais. 🧠")
     else:
         print("Je révise les commandes utiles...")
-        aide = Discussion(COMMANDES, cachees=16, seed=0)
-        aide.entrainer(epochs=4000, taux=0.3)
-        aide.sauvegarder(FICHIER)
+        helper = Discussion(COMMANDES, cachees=16, seed=0)
+        helper.entrainer(epochs=4000, taux=0.3)
+        helper.sauvegarder(FICHIER)
 
-    print("Prêt ! " + AIDE + "\n")
-
-    while True:
-        try:
-            phrase = input("Toi : ").strip()
-        except (EOFError, KeyboardInterrupt):
-            print("\nMonIA : Au revoir !")
-            break
-
-        if phrase.lower() in {"quitter", "stop", "exit", "quit"}:
-            print("MonIA : Au revoir !")
-            break
-        if not phrase:
-            continue
-        if phrase.lower() in {"aide", "help", "?"}:
-            print("MonIA :\n" + AIDE)
-            continue
-
-        if phrase.lower().startswith("apprends"):
-            corps = phrase.split(":", 1)[1] if ":" in phrase else ""
-            if SEPARATEUR not in corps:
-                print(f"MonIA : Écris :  apprends: ce que tu veux faire {SEPARATEUR} la commande")
-                continue
-            question, commande = corps.split(SEPARATEUR, 1)
-            question, commande = question.strip(), commande.strip()
-            if not question or not commande:
-                print("MonIA : Il me faut une demande ET une commande.")
-                continue
-            aide.apprendre(question, commande)
-            aide.sauvegarder(FICHIER)
-            print(f"MonIA : Astuce apprise ! « {question} »")
-            continue
-
-        reponse = aide.repondre(phrase)
-        if "ne sais pas" in reponse.lower():
-            print("MonIA : " + reponse)
-        else:
-            _afficher(reponse)
+    boucle(helper, FICHIER, separateur=SEPARATEUR, afficher=_afficher, aide=AIDE, voix=voix)

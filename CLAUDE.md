@@ -378,7 +378,15 @@ one menu (`monia.py`).
   discussion.py` an interactive French chat loop (same exit keywords as `jarvis`)
   that **auto-loads/saves `chat.json`** and supports live teaching by typing
   `apprends: question = réponse` (and `aide`). **Honest framing:** this is a small
-  intent-classifier chatbot, not an LLM — it answers what you teach it.
+  intent-classifier chatbot, not an LLM — it answers what you teach it. Also exposes
+  `lister()` and `oublier(question)` (rebuilds+retrains; returns count, 0 if no
+  match, -1 if it would empty the memory). The module-level **`boucle(chat,
+  fichier, separateur, afficher, aide, voix)`** is the **shared interactive chat
+  loop reused by all six assistants** (codeur/commandes/github/cyber/failles import
+  it) — it handles `liste`/`oublie:`/`voix`/`aide`/`apprends:` plus the per-assistant
+  `afficher` callback and teaching separator. **`parler(texte, actif)`** speaks via
+  `termux-tts-speak` if present (no-op otherwise); pass `voix` as an argv token to
+  start with voice on.
 - `ecrivain.py` — **lesson 6, a Markov text generator** (the honest answer to
   "teach it a book": the bag-of-words chatbot learns Q/A pairs, which a book has
   none of). `Ecrivain(ordre=2)` learns an order-N word model: `jetons()` tokenizes
@@ -441,7 +449,11 @@ one menu (`monia.py`).
   `re` only; module-level `REGLES` is a list of `(nom, compiled_regex, severite,
   conseil, masquer_secret)`. `analyser_texte(texte)` scans line by line and returns
   finding dicts `{ligne, severite, nom, conseil, extrait}` sorted by line then
-  severity; `analyser_fichier(chemin)` reads a file first. Detects hardcoded
+  severity; `analyser_fichier(chemin)` reads a file first; `analyser_dossier(chemin)`
+  walks a directory (skipping `.git`/`__pycache__`/`venv`/`node_modules`/…, only
+  `EXTENSIONS` text files) and returns `{fichier: [trouvailles]}`. The CLI accepts a
+  file, a directory (`.` for the whole tree), or no arg for an interactive paste/scan
+  loop. Detects hardcoded
   secrets, `eval`/`exec`, `os.system`/`popen`/`shell=True`, likely SQL injection,
   unsafe `pickle`/`yaml.load`, weak `md5`/`sha1`, `verify=False`, insecure `random`
   for secrets, `http://`, `debug=True`, `tempfile.mktemp`. **Redaction-first** like
@@ -464,12 +476,12 @@ python -m pytest monia/                 # if pytest is installed
 cd monia && python test_monia.py        # zero-dependency fallback runner
 ```
 
-18 tests: weight-matrix shapes, seed reproducibility, activation derivatives,
+34 tests: weight-matrix shapes, seed reproducibility, activation derivatives,
 learning `y = 2x` (and predicting an unseen `x=10`), error decreasing over
 epochs, learning the non-linear XOR, save/load round-trip of the memory, the
 chatbot (`mots()` tokenizing, answering a learned question, the honest "don't
-know" path on out-of-vocabulary input, live `apprendre()`, and chatbot
-save/load), the text generator (`jetons()` tokenizing, vocabulary learning,
+know" path on out-of-vocabulary input, live `apprendre()`, `lister`/`oublier`, and
+chatbot save/load), the text generator (`jetons()` tokenizing, vocabulary learning,
 generation staying within the learned vocabulary, and save/load), the coding
 assistant (well-formed `CONNAISSANCES_CODE`, answering with Python), the
 command helper (well-formed `COMMANDES`, returning the right shell command), the
@@ -477,7 +489,7 @@ GitHub assistant (well-formed `CONNAISSANCES_GITHUB`, explaining cloning), the
 cybersecurity assistant (well-formed `CONNAISSANCES_CYBER`, explaining phishing),
 the vulnerability assistant (well-formed `CONNAISSANCES_FAILLES`, explaining SQL
 injection), the static analyzer (finds flaws, masks secrets, stays quiet on clean
-code), and the menu (`LECONS` entries all point to existing files).
+code, scans a folder), and the menu (`LECONS` entries all point to existing files).
 Same zero-dep runner pattern as the other modules (`tmp_path` via
 `tempfile.TemporaryDirectory`). **No test depends on any external package.**
 

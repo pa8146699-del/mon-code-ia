@@ -16,7 +16,7 @@ Lancer :  python3 github.py
 import os
 import re
 
-from discussion import Discussion
+from discussion import Discussion, boucle
 
 FICHIER = os.path.join(os.path.dirname(__file__), "github.json")
 SEPARATEUR = ">>>"
@@ -75,6 +75,10 @@ def _afficher(reponse):
 
 
 if __name__ == "__main__":
+    import sys
+
+    voix = "voix" in sys.argv
+
     if os.path.exists(FICHIER):
         gh = Discussion.charger(FICHIER)
         print("J'ai rechargé tout ce que je sais sur GitHub. 🧠")
@@ -84,41 +88,4 @@ if __name__ == "__main__":
         gh.entrainer(epochs=4000, taux=0.3)
         gh.sauvegarder(FICHIER)
 
-    print("Prêt ! " + AIDE + "\n")
-
-    while True:
-        try:
-            phrase = input("Toi : ").strip()
-        except (EOFError, KeyboardInterrupt):
-            print("\nMonIA : Au revoir !")
-            break
-
-        if phrase.lower() in {"quitter", "stop", "exit", "quit"}:
-            print("MonIA : Au revoir !")
-            break
-        if not phrase:
-            continue
-        if phrase.lower() in {"aide", "help", "?"}:
-            print("MonIA :\n" + AIDE)
-            continue
-
-        if phrase.lower().startswith("apprends"):
-            corps = phrase.split(":", 1)[1] if ":" in phrase else ""
-            if SEPARATEUR not in corps:
-                print(f"MonIA : Écris :  apprends: ta question {SEPARATEUR} ta réponse")
-                continue
-            question, reponse = corps.split(SEPARATEUR, 1)
-            question, reponse = question.strip(), reponse.strip()
-            if not question or not reponse:
-                print("MonIA : Il me faut une question ET une réponse.")
-                continue
-            gh.apprendre(question, reponse)
-            gh.sauvegarder(FICHIER)
-            print(f"MonIA : Appris ! « {question} »")
-            continue
-
-        reponse = gh.repondre(phrase)
-        if "ne sais pas" in reponse.lower():
-            print("MonIA : " + reponse)
-        else:
-            _afficher(reponse)
+    boucle(gh, FICHIER, separateur=SEPARATEUR, afficher=_afficher, aide=AIDE, voix=voix)

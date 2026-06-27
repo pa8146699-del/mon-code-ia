@@ -65,6 +65,26 @@ python3 monia.py
 
 Tu tapes un numéro, l'outil se lance ; quand tu le quittes, tu reviens au menu.
 
+### Commandes communes à tous les assistants
+
+Les 6 assistants (discuter, coder, dépanner, GitHub, cybersécurité, failles)
+partagent la même boucle de discussion. Dans n'importe lequel, tu peux taper :
+
+| Tu tapes | Effet |
+|---|---|
+| `liste` | voir tout ce qu'il sait (les questions connues) |
+| `oublie: <question>` | lui faire oublier une réponse |
+| `voix` | activer/couper la lecture à voix haute |
+| `aide` | revoir les commandes |
+| `quitter` | sortir |
+
+**La voix** utilise `termux-tts-speak` (déjà présent sur Termux) : ton IA lit ses
+réponses à voix haute. Lance avec la voix dès le départ :
+```bash
+python3 cyber.py voix
+```
+Sur un PC sans `termux-tts-speak`, la voix est simplement ignorée (aucune erreur).
+
 ## Les leçons (à lire/lancer dans l'ordre)
 
 | Fichier | Leçon |
@@ -300,7 +320,8 @@ et repère les motifs à risque, avec le risque et la correction. Les secrets so
 
 ```bash
 python3 analyseur.py mon_fichier.py   # analyse un fichier
-python3 analyseur.py                  # mode interactif (colle du code)
+python3 analyseur.py .                 # analyse TOUT le dossier (récursif)
+python3 analyseur.py                   # mode interactif (colle du code)
 ```
 ```
 🛡️  ligne 2 — [HAUTE] Secret en clair
@@ -313,6 +334,9 @@ SQL probable, `pickle`/`yaml.load` non sûrs, hachage faible (md5/sha1), TLS
 désactivé (`verify=False`), aléa non sûr (`random` pour un secret), liens `http`,
 `debug=True`, `tempfile.mktemp`.
 
+Donne-lui un **dossier** (`.` pour le dossier courant) et il scanne tous les
+fichiers texte récursivement, en sautant `.git`, `__pycache__`, etc.
+
 ✅ **100 % légal** : tu analyses **ton** code, sur **ta** machine — aucune cible
 distante. C'est heuristique : il signale des motifs probables, à toi de juger.
 Même esprit que `dataguard/`.
@@ -324,7 +348,7 @@ python -m pytest monia/            # si pytest est installé
 cd monia && python3 test_monia.py  # runner zéro-dépendance
 ```
 
-32 tests : formes des poids, reproductibilité de la graine, dérivées des
+34 tests : formes des poids, reproductibilité de la graine, dérivées des
 activations, apprentissage de `y = 2x`, décroissance de l'erreur, apprentissage
 du XOR non-linéaire, sauvegarde/rechargement de la mémoire, le chatbot
 (découpage en mots, réponse à une question apprise, aveu d'ignorance,
@@ -335,7 +359,8 @@ de commandes (base valide, bonne commande renvoyée), l'assistant GitHub (base
 valide, explique le clonage), l'assistant cybersécurité (base valide, explique le
 phishing), l'assistant failles (base valide, explique l'injection SQL),
 l'analyseur de code (trouve les failles, masque les secrets, ne crie pas au loup
-sur du code propre) et le menu (chaque entrée pointe vers un fichier existant).
+sur du code propre, analyse un dossier), `liste`/`oublie` du chatbot, et le menu
+(chaque entrée pointe vers un fichier existant).
 
 ## Pourquoi « from scratch » ?
 

@@ -22,7 +22,7 @@ Lancer :  python3 cyber.py
 
 import os
 
-from discussion import Discussion
+from discussion import Discussion, boucle
 
 FICHIER = os.path.join(os.path.dirname(__file__), "cyber.json")
 SEPARATEUR = ">>>"
@@ -67,6 +67,10 @@ CONNAISSANCES_CYBER = [
 
 
 if __name__ == "__main__":
+    import sys
+
+    voix = "voix" in sys.argv
+
     if os.path.exists(FICHIER):
         cyber = Discussion.charger(FICHIER)
         print("J'ai rechargé tout ce que je sais en cybersécurité. 🛡️")
@@ -76,37 +80,4 @@ if __name__ == "__main__":
         cyber.entrainer(epochs=4000, taux=0.3)
         cyber.sauvegarder(FICHIER)
 
-    print("Prêt ! " + AIDE + "\n")
-
-    while True:
-        try:
-            phrase = input("Toi : ").strip()
-        except (EOFError, KeyboardInterrupt):
-            print("\nMonIA : Au revoir, et reste prudent !")
-            break
-
-        if phrase.lower() in {"quitter", "stop", "exit", "quit"}:
-            print("MonIA : Au revoir, et reste prudent !")
-            break
-        if not phrase:
-            continue
-        if phrase.lower() in {"aide", "help", "?"}:
-            print("MonIA :\n" + AIDE)
-            continue
-
-        if phrase.lower().startswith("apprends"):
-            corps = phrase.split(":", 1)[1] if ":" in phrase else ""
-            if SEPARATEUR not in corps:
-                print(f"MonIA : Écris :  apprends: ta question {SEPARATEUR} ton explication")
-                continue
-            question, explication = corps.split(SEPARATEUR, 1)
-            question, explication = question.strip(), explication.strip()
-            if not question or not explication:
-                print("MonIA : Il me faut une question ET une explication.")
-                continue
-            cyber.apprendre(question, explication)
-            cyber.sauvegarder(FICHIER)
-            print(f"MonIA : Note apprise ! « {question} »")
-            continue
-
-        print("MonIA : " + cyber.repondre(phrase))
+    boucle(cyber, FICHIER, separateur=SEPARATEUR, aide=AIDE, voix=voix)

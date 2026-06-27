@@ -19,7 +19,7 @@ Lancer :  python3 codeur.py
 
 import os
 
-from discussion import Discussion
+from discussion import Discussion, boucle
 
 FICHIER = os.path.join(os.path.dirname(__file__), "codeur.json")
 
@@ -64,14 +64,21 @@ CONNAISSANCES_CODE = [
 ]
 
 
-def _afficher_code(code):
-    """Affiche un bout de code, lisiblement, encadré."""
+def _afficher_code(reponse):
+    """Affiche un bout de code, lisiblement, indenté."""
+    if "ne sais pas" in reponse.lower():
+        print("MonIA : " + reponse)
+        return
     print("MonIA (Python) :")
-    for ligne in code.split("\n"):
+    for ligne in reponse.split("\n"):
         print("    " + ligne)
 
 
 if __name__ == "__main__":
+    import sys
+
+    voix = "voix" in sys.argv
+
     if os.path.exists(FICHIER):
         codeur = Discussion.charger(FICHIER)
         print("J'ai rechargé toutes les recettes que tu m'as apprises. 🧠")
@@ -81,41 +88,4 @@ if __name__ == "__main__":
         codeur.entrainer(epochs=4000, taux=0.3)
         codeur.sauvegarder(FICHIER)
 
-    print("Prêt ! " + AIDE + "\n")
-
-    while True:
-        try:
-            phrase = input("Toi : ").strip()
-        except (EOFError, KeyboardInterrupt):
-            print("\nMonIA : Au revoir !")
-            break
-
-        if phrase.lower() in {"quitter", "stop", "exit", "quit"}:
-            print("MonIA : Au revoir !")
-            break
-        if not phrase:
-            continue
-        if phrase.lower() in {"aide", "help", "?"}:
-            print("MonIA :\n" + AIDE)
-            continue
-
-        if phrase.lower().startswith("apprends"):
-            corps = phrase.split(":", 1)[1] if ":" in phrase else ""
-            if SEPARATEUR not in corps:
-                print(f"MonIA : Écris :  apprends: ta question {SEPARATEUR} ton code")
-                continue
-            question, code = corps.split(SEPARATEUR, 1)
-            question, code = question.strip(), code.strip()
-            if not question or not code:
-                print("MonIA : Il me faut une question ET du code.")
-                continue
-            codeur.apprendre(question, code)
-            codeur.sauvegarder(FICHIER)
-            print(f"MonIA : Recette apprise ! « {question} »")
-            continue
-
-        reponse = codeur.repondre(phrase)
-        if "ne sais pas" in reponse.lower():
-            print("MonIA : " + reponse)
-        else:
-            _afficher_code(reponse)
+    boucle(codeur, FICHIER, separateur=SEPARATEUR, afficher=_afficher_code, aide=AIDE, voix=voix)

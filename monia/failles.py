@@ -20,7 +20,7 @@ Lancer :  python3 failles.py
 
 import os
 
-from discussion import Discussion
+from discussion import Discussion, boucle
 
 FICHIER = os.path.join(os.path.dirname(__file__), "failles.json")
 SEPARATEUR = ">>>"
@@ -71,37 +71,7 @@ if __name__ == "__main__":
         failles.entrainer(epochs=4000, taux=0.3)
         failles.sauvegarder(FICHIER)
 
-    print("Prêt ! " + AIDE + "\n")
+    import sys
 
-    while True:
-        try:
-            phrase = input("Toi : ").strip()
-        except (EOFError, KeyboardInterrupt):
-            print("\nMonIA : Au revoir, et code en sécurité !")
-            break
-
-        if phrase.lower() in {"quitter", "stop", "exit", "quit"}:
-            print("MonIA : Au revoir, et code en sécurité !")
-            break
-        if not phrase:
-            continue
-        if phrase.lower() in {"aide", "help", "?"}:
-            print("MonIA :\n" + AIDE)
-            continue
-
-        if phrase.lower().startswith("apprends"):
-            corps = phrase.split(":", 1)[1] if ":" in phrase else ""
-            if SEPARATEUR not in corps:
-                print(f"MonIA : Écris :  apprends: ta question {SEPARATEUR} ton explication")
-                continue
-            question, explication = corps.split(SEPARATEUR, 1)
-            question, explication = question.strip(), explication.strip()
-            if not question or not explication:
-                print("MonIA : Il me faut une question ET une explication.")
-                continue
-            failles.apprendre(question, explication)
-            failles.sauvegarder(FICHIER)
-            print(f"MonIA : Note apprise ! « {question} »")
-            continue
-
-        print("MonIA : " + failles.repondre(phrase))
+    voix = "voix" in sys.argv
+    boucle(failles, FICHIER, separateur=SEPARATEUR, aide=AIDE, voix=voix)

@@ -120,6 +120,20 @@ def test_chatbot_avoue_ne_pas_savoir():
     assert "ne sais pas" in chat.repondre("xyzzy plugh").lower()
 
 
+def test_chatbot_lister_et_oublier():
+    paires = [("bonjour", "Salut !"), ("au revoir", "À bientôt."), ("merci", "De rien.")]
+    chat = Discussion(paires, seed=0)
+    chat.entrainer(epochs=500, taux=0.3)
+    assert len(chat.lister()) == 3
+
+    assert chat.oublier("merci") == 1            # un couple supprimé
+    assert len(chat.lister()) == 2
+    assert chat.oublier("inexistant") == 0       # rien à oublier
+    chat.oublier("au revoir")
+    assert chat.oublier("bonjour") == -1         # refuse de tout vider
+    assert len(chat.lister()) == 1
+
+
 def test_chatbot_apprend_en_direct():
     # Enseignement à la volée : une nouvelle paire, et elle sait répondre.
     chat = Discussion([("bonjour", "Salut !")], seed=0)
@@ -295,6 +309,17 @@ def test_analyseur_code_propre_sans_alerte():
 
     code = "x = 2 + 2\nprint('Bonjour')\n"
     assert analyseur.analyser_texte(code) == []
+
+
+def test_analyseur_dossier(tmp_path: Path):
+    import analyseur
+
+    (tmp_path / "sale.py").write_text('password = "secret123"\n', encoding="utf-8")
+    (tmp_path / "propre.py").write_text("x = 1 + 1\n", encoding="utf-8")
+    resultats = analyseur.analyser_dossier(str(tmp_path))
+    fichiers = {os.path.basename(c) for c in resultats}
+    assert "sale.py" in fichiers
+    assert "propre.py" not in fichiers
 
 
 def test_menu_pointe_vers_des_fichiers_existants():

@@ -100,6 +100,29 @@ def analyser_fichier(chemin):
         return analyser_texte(f.read())
 
 
+# Extensions de fichiers texte que l'on analyse dans un dossier.
+EXTENSIONS = (".py", ".txt", ".sh", ".js", ".html", ".php", ".rb", ".java", ".c", ".cfg", ".ini", ".env", ".yml", ".yaml")
+# Dossiers qu'on saute (rien d'intéressant ou trop gros).
+DOSSIERS_IGNORES = {".git", "__pycache__", ".venv", "venv", "node_modules", ".mypy_cache", "bin"}
+
+
+def analyser_dossier(chemin):
+    """Analyse tous les fichiers texte d'un dossier (et sous-dossiers).
+
+    Renvoie un dict {chemin_fichier: [trouvailles]} pour les fichiers concernés.
+    """
+    resultats = {}
+    for racine, dossiers, fichiers in os.walk(chemin):
+        dossiers[:] = [d for d in dossiers if d not in DOSSIERS_IGNORES]
+        for nom in fichiers:
+            if nom.endswith(EXTENSIONS):
+                chemin_f = os.path.join(racine, nom)
+                trouvailles = analyser_fichier(chemin_f)
+                if trouvailles:
+                    resultats[chemin_f] = trouvailles
+    return resultats
+
+
 def _afficher(trouvailles, source):
     if not trouvailles:
         print(f"✅ Aucune faille évidente trouvée dans {source}.")
@@ -114,13 +137,23 @@ def _afficher(trouvailles, source):
 if __name__ == "__main__":
     if len(sys.argv) > 1:
         chemin = sys.argv[1]
-        if not os.path.isfile(chemin):
-            print(f"❌ Fichier introuvable : {chemin}")
-            print("   Donne le chemin d'un VRAI fichier. Exemples :")
+        if os.path.isdir(chemin):
+            resultats = analyser_dossier(chemin)
+            if not resultats:
+                print(f"✅ Aucune faille évidente dans le dossier {chemin}.")
+            else:
+                total = sum(len(v) for v in resultats.values())
+                print(f"🛡️  {total} point(s) à vérifier dans {len(resultats)} fichier(s) :\n")
+                for fichier, trouvailles in resultats.items():
+                    _afficher(trouvailles, fichier)
+        elif os.path.isfile(chemin):
+            _afficher(analyser_fichier(chemin), chemin)
+        else:
+            print(f"❌ Introuvable : {chemin}")
+            print("   Donne le chemin d'un VRAI fichier ou dossier. Exemples :")
             print("   python3 analyseur.py discussion.py")
-            print("   python3 analyseur.py ~/mon-code-ia/monia/reseau.py")
+            print("   python3 analyseur.py .            (tout le dossier courant)")
             raise SystemExit(1)
-        _afficher(analyser_fichier(chemin), chemin)
     else:
         print("Analyseur de failles — colle une ligne de code, ou tape le nom")
         print("d'un fichier à analyser (quitter pour sortir).\n")
@@ -135,7 +168,13 @@ if __name__ == "__main__":
                 break
             if not entree:
                 continue
-            if os.path.isfile(entree):
+            if os.path.isdir(entree):
+                resultats = analyser_dossier(entree)
+                if not resultats:
+                    print(f"✅ Aucune faille évidente dans le dossier {entree}.")
+                for fichier, trouvailles in resultats.items():
+                    _afficher(trouvailles, fichier)
+            elif os.path.isfile(entree):
                 _afficher(analyser_fichier(entree), entree)
             else:
                 _afficher(analyser_texte(entree), "ton code")
