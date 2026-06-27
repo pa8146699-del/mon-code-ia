@@ -73,6 +73,7 @@ mon-code-ia/
     ├── discussion.py                 # Lesson 5: bag-of-words chatbot (reuses reseau.py)
     ├── ecrivain.py                   # Lesson 6: Markov text generator (learns a book)
     ├── codeur.py                     # Lesson 7: Python-coding assistant (reuses Discussion)
+    ├── commandes.py                  # Lesson 8: terminal-command helper (reuses Discussion)
     ├── test_monia.py                 # Tests (pytest + zero-dep runner)
     └── README.md
 ```
@@ -387,9 +388,18 @@ module; nothing is copied at build time (no APK — it's a CLI/library).
   teaching uses `apprends: question >>> code` — the `>>>` separator (not `=`)
   because code answers commonly contain `=`. Honest framing: a growable Python
   cheat-sheet, not real code understanding.
-- `memoire.json` / `chat.json` / `ecrivain.json` / `codeur.json` (written by
-  `memoire.py` / `discussion.py` / `ecrivain.py` / `codeur.py`) and `monia/*.txt`
-  (downloaded books) are git-ignored.
+- `commandes.py` — **lesson 8, a terminal-command helper** for when the user is
+  stuck. Same `Discussion` engine; the `COMMANDES` knowledge base maps a French
+  intent to a shell command + a one-line explanation (answer is `"cmd\nexplication"`,
+  printed as `$ cmd` then the note). Covers navigation (`ls`/`cd`/`pwd`/`mkdir`),
+  files (`nano`/`cat`/`rm`/`cp`/`mv`), git (`pull`/`status`/`add`+`commit`+`push`/`clone`),
+  Python (`python3 file.py`/`pip install`/`Ctrl+C`), Termux/Debian (`apt`), and how
+  to launch MonIA — plus extra phrasing variants pointing at the same answers to
+  help the bag-of-words classifier generalize. Auto-loads/saves `commandes.json`;
+  live teaching via `apprends: intent >>> command`.
+- `memoire.json` / `chat.json` / `ecrivain.json` / `codeur.json` / `commandes.json`
+  (written by `memoire.py` / `discussion.py` / `ecrivain.py` / `codeur.py` /
+  `commandes.py`) and `monia/*.txt` (downloaded books) are git-ignored.
 
 ### MonIA tests
 
@@ -404,8 +414,9 @@ epochs, learning the non-linear XOR, save/load round-trip of the memory, the
 chatbot (`mots()` tokenizing, answering a learned question, the honest "don't
 know" path on out-of-vocabulary input, live `apprendre()`, and chatbot
 save/load), the text generator (`jetons()` tokenizing, vocabulary learning,
-generation staying within the learned vocabulary, and save/load), and the
-coding assistant (well-formed `CONNAISSANCES_CODE`, answering with Python).
+generation staying within the learned vocabulary, and save/load), the coding
+assistant (well-formed `CONNAISSANCES_CODE`, answering with Python), and the
+command helper (well-formed `COMMANDES`, returning the right shell command).
 Same zero-dep runner pattern as the other modules (`tmp_path` via
 `tempfile.TemporaryDirectory`). **No test depends on any external package.**
 

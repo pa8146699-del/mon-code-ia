@@ -192,6 +192,25 @@ def test_codeur_repond_avec_du_code():
     assert "print" in assistant.repondre("comment afficher du texte")
 
 
+# --- Dépanneur de commandes (leçon 8) ---------------------------------------
+
+def test_commandes_base_valide():
+    import commandes
+
+    assert len(commandes.COMMANDES) >= 15
+    for question, commande in commandes.COMMANDES:
+        assert isinstance(question, str) and question
+        assert isinstance(commande, str) and commande
+
+
+def test_commandes_donne_la_bonne_commande():
+    import commandes
+
+    aide = Discussion(commandes.COMMANDES, cachees=16, seed=0)
+    aide.entrainer(epochs=2000, taux=0.3)
+    assert aide.repondre("comment voir mes fichiers").startswith("ls")
+
+
 if __name__ == "__main__":
     import tempfile
 

@@ -51,6 +51,7 @@ cd monia && python3 reseau.py
 | `discussion.py` | **5. Discuter** : un chatbot qui apprend des mots pour répondre. |
 | `ecrivain.py` | **6. Lire un livre** : apprend tout le vocabulaire d'un texte et écrit. |
 | `codeur.py` | **7. Apprendre à coder** : répond à tes questions avec du code Python. |
+| `commandes.py` | **8. Le dépanneur** : les bonnes commandes du terminal quand tu bloques. |
 
 ```bash
 cd monia
@@ -61,6 +62,7 @@ python3 memoire.py
 python3 discussion.py     # discute avec ton IA (tape 'quitter' pour sortir)
 python3 ecrivain.py       # lit un texte d'exemple et écrit dans son style
 python3 codeur.py         # pose une question, il répond en Python
+python3 commandes.py      # bloqué dans le terminal ? il te donne la commande
 ```
 
 ### Le chatbot — `discussion.py`
@@ -161,6 +163,29 @@ Tout est retenu dans `codeur.json` et rechargé au prochain lancement. Comme le
 chatbot, il ne « comprend » pas la programmation : c'est un aide-mémoire Python
 de poche qui grandit avec toi.
 
+### Le dépanneur du terminal — `commandes.py`
+
+Bloqué dans le terminal ? Demande-lui en français ce que tu veux faire, il te
+donne **la commande exacte** (Termux / Linux / git / Python) avec une petite
+explication :
+
+```bash
+python3 commandes.py
+```
+```
+Toi : comment récupérer le code
+MonIA — la commande :
+    $ git pull
+    (télécharge les nouveautés du projet)
+```
+
+Il connaît : se déplacer dans les dossiers (`ls`, `cd`, `pwd`, `mkdir`), les
+fichiers (`nano`, `cat`, `rm`, `cp`, `mv`), `git` (`pull`, `status`, `add`/`commit`/`push`,
+`clone`), Python (`python3 fichier.py`, `pip install`, `Ctrl+C`), Termux/Debian
+(`apt install`, `apt update`) et comment lancer ton IA. Apprends-lui tes
+astuces : `apprends: ce que tu veux faire >>> la commande` (mémoire dans
+`commandes.json`).
+
 ## Tests
 
 ```bash
@@ -168,13 +193,14 @@ python -m pytest monia/            # si pytest est installé
 cd monia && python3 test_monia.py  # runner zéro-dépendance
 ```
 
-20 tests : formes des poids, reproductibilité de la graine, dérivées des
+22 tests : formes des poids, reproductibilité de la graine, dérivées des
 activations, apprentissage de `y = 2x`, décroissance de l'erreur, apprentissage
 du XOR non-linéaire, sauvegarde/rechargement de la mémoire, le chatbot
 (découpage en mots, réponse à une question apprise, aveu d'ignorance,
 apprentissage en direct, sauvegarde/rechargement), le générateur de texte
 (découpage, apprentissage du vocabulaire, génération, sauvegarde/rechargement),
-et l'assistant de code (base de recettes valide, réponse en Python).
+l'assistant de code (base de recettes valide, réponse en Python) et le dépanneur
+de commandes (base valide, bonne commande renvoyée).
 
 ## Pourquoi « from scratch » ?
 
