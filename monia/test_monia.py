@@ -172,6 +172,26 @@ def test_ecrivain_sauvegarder_et_charger(tmp_path: Path):
     assert recharge.generer(seed=1) == ec.generer(seed=1)
 
 
+# --- Assistant de code Python (leçon 7) -------------------------------------
+
+def test_codeur_base_de_connaissances():
+    import codeur
+
+    assert len(codeur.CONNAISSANCES_CODE) >= 10
+    for question, code in codeur.CONNAISSANCES_CODE:
+        assert isinstance(question, str) and question
+        assert isinstance(code, str) and code
+
+
+def test_codeur_repond_avec_du_code():
+    # L'assistant de code n'est qu'un Discussion avec des réponses = du Python.
+    import codeur
+
+    assistant = Discussion(codeur.CONNAISSANCES_CODE[:6], cachees=16, seed=0)
+    assistant.entrainer(epochs=2000, taux=0.3)
+    assert "print" in assistant.repondre("comment afficher du texte")
+
+
 if __name__ == "__main__":
     import tempfile
 

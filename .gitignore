@@ -41,4 +41,5 @@ netscan/bin/
 monia/memoire.json
 monia/chat.json
 monia/ecrivain.json
+monia/codeur.json
 monia/*.txt

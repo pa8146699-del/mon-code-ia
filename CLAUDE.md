@@ -72,6 +72,7 @@ mon-code-ia/
     ├── memoire.py                    # Lesson 4: save/load weights (JSON memory)
     ├── discussion.py                 # Lesson 5: bag-of-words chatbot (reuses reseau.py)
     ├── ecrivain.py                   # Lesson 6: Markov text generator (learns a book)
+    ├── codeur.py                     # Lesson 7: Python-coding assistant (reuses Discussion)
     ├── test_monia.py                 # Tests (pytest + zero-dep runner)
     └── README.md
 ```
@@ -378,9 +379,17 @@ module; nothing is copied at build time (no APK — it's a CLI/library).
   a real book, or no arg to learn the bundled public-domain `EXEMPLE` (La Fontaine).
   **Deliberately not a neural net** — Markov is the right, fast, stdlib tool to
   absorb a whole book's vocabulary; framed as such to the user.
-- `memoire.json` / `chat.json` / `ecrivain.json` (written by `memoire.py` /
-  `discussion.py` / `ecrivain.py`) and `monia/*.txt` (downloaded books) are
-  git-ignored.
+- `codeur.py` — **lesson 7, a Python-coding assistant**. Thin layer over
+  `Discussion`: the same bag-of-words neural chatbot, but the `CONNAISSANCES_CODE`
+  knowledge base maps a French question to a **Python snippet** (print, variables,
+  loops, conditions, functions, lists, random, files…). Interactive loop
+  auto-loads/saves `codeur.json` and prints answers as indented code; live
+  teaching uses `apprends: question >>> code` — the `>>>` separator (not `=`)
+  because code answers commonly contain `=`. Honest framing: a growable Python
+  cheat-sheet, not real code understanding.
+- `memoire.json` / `chat.json` / `ecrivain.json` / `codeur.json` (written by
+  `memoire.py` / `discussion.py` / `ecrivain.py` / `codeur.py`) and `monia/*.txt`
+  (downloaded books) are git-ignored.
 
 ### MonIA tests
 
@@ -394,8 +403,9 @@ learning `y = 2x` (and predicting an unseen `x=10`), error decreasing over
 epochs, learning the non-linear XOR, save/load round-trip of the memory, the
 chatbot (`mots()` tokenizing, answering a learned question, the honest "don't
 know" path on out-of-vocabulary input, live `apprendre()`, and chatbot
-save/load), and the text generator (`jetons()` tokenizing, vocabulary learning,
-generation staying within the learned vocabulary, and save/load).
+save/load), the text generator (`jetons()` tokenizing, vocabulary learning,
+generation staying within the learned vocabulary, and save/load), and the
+coding assistant (well-formed `CONNAISSANCES_CODE`, answering with Python).
 Same zero-dep runner pattern as the other modules (`tmp_path` via
 `tempfile.TemporaryDirectory`). **No test depends on any external package.**
 

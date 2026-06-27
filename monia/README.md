@@ -50,6 +50,7 @@ cd monia && python3 reseau.py
 | `memoire.py` | **4. La mémoire** : sauvegarder/recharger les poids en JSON. |
 | `discussion.py` | **5. Discuter** : un chatbot qui apprend des mots pour répondre. |
 | `ecrivain.py` | **6. Lire un livre** : apprend tout le vocabulaire d'un texte et écrit. |
+| `codeur.py` | **7. Apprendre à coder** : répond à tes questions avec du code Python. |
 
 ```bash
 cd monia
@@ -59,6 +60,7 @@ python3 entrainement.py
 python3 memoire.py
 python3 discussion.py     # discute avec ton IA (tape 'quitter' pour sortir)
 python3 ecrivain.py       # lit un texte d'exemple et écrit dans son style
+python3 codeur.py         # pose une question, il répond en Python
 ```
 
 ### Le chatbot — `discussion.py`
@@ -130,6 +132,35 @@ coller n'importe quel texte (chanson, article) dans un fichier `.txt`.
 Ce n'est **pas** un réseau de neurones (c'est statistique), mais c'est l'outil
 adapté pour apprendre beaucoup de mots d'un coup, et ça reste 100 % stdlib.
 
+### Apprendre à coder — `codeur.py`
+
+Le même chatbot (réseau de neurones), mais sa base de connaissances associe une
+question en français à un **bout de code Python**. Tu demandes, il répond en
+Python :
+
+```bash
+python3 codeur.py
+```
+```
+Toi : comment faire une boucle qui répète
+MonIA (Python) :
+    for i in range(10):
+        print(i)
+```
+
+Il connaît déjà les recettes de base (afficher, variables, boucles, conditions,
+fonctions, listes, hasard, fichiers…) et comprend les reformulations. Tu peux
+lui apprendre tes propres recettes en direct — comme le code contient souvent un
+`=`, on utilise `>>>` comme séparateur :
+
+```
+apprends: comment dire bonjour >>> print("Bonjour le monde")
+```
+
+Tout est retenu dans `codeur.json` et rechargé au prochain lancement. Comme le
+chatbot, il ne « comprend » pas la programmation : c'est un aide-mémoire Python
+de poche qui grandit avec toi.
+
 ## Tests
 
 ```bash
@@ -137,12 +168,13 @@ python -m pytest monia/            # si pytest est installé
 cd monia && python3 test_monia.py  # runner zéro-dépendance
 ```
 
-18 tests : formes des poids, reproductibilité de la graine, dérivées des
+20 tests : formes des poids, reproductibilité de la graine, dérivées des
 activations, apprentissage de `y = 2x`, décroissance de l'erreur, apprentissage
 du XOR non-linéaire, sauvegarde/rechargement de la mémoire, le chatbot
 (découpage en mots, réponse à une question apprise, aveu d'ignorance,
-apprentissage en direct, sauvegarde/rechargement), et le générateur de texte
-(découpage, apprentissage du vocabulaire, génération, sauvegarde/rechargement).
+apprentissage en direct, sauvegarde/rechargement), le générateur de texte
+(découpage, apprentissage du vocabulaire, génération, sauvegarde/rechargement),
+et l'assistant de code (base de recettes valide, réponse en Python).
 
 ## Pourquoi « from scratch » ?
 
