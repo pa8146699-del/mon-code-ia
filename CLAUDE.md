@@ -14,6 +14,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - `monappli/` — a second, personal Kivy security app reusing DataGuard, with its own combined "Tout analyser" action and its own APK build.
 - `termux/` — install/launch shell scripts to run the `dataguard/` toolkit on Android via Termux (no APK, no pip — it's a pure-stdlib CLI). `install.sh` installs `python`+`git`, clones the repo, and drops a `dataguard` launcher in `$PREFIX/bin`; `update.sh` is a `git pull` wrapper.
 - `netscan/` — a Kivy GUI (Android) network/port scanner: TCP-connect scan (no root) of a `/24` subnet or a single host. **Self-contained** (stdlib `socket`/`threading` + Kivy) — reuses no other module, so nothing is copied at build time. Its own APK build.
+- `monia/` — a **from-scratch neural network**, 100% home-made and **stdlib-only** (no numpy/torch): a multi-layer perceptron (`reseau.py`) trained by backpropagation, with four progressive French teaching scripts (neuron → learning → training loop → persistent memory). Reuses no other module; runs anywhere, including Termux on a phone.
 
 `jarvis/`, `agentos/`, and `dataguard/` share no code with each other. Reuse-via-copy (single source of truth stays in the origin folder, copies are git-ignored & created at build time):
 - `mobile/` reuses `dataguard/detectors.py` + `dataguard/phishing.py`.
@@ -59,9 +60,17 @@ mon-code-ia/
 │   ├── main.py                       # Personal Kivy GUI (adds "Tout analyser")
 │   ├── buildozer.spec                # Android build config
 │   └── README.md
-└── agentmobile/
-    ├── main.py                       # Kivy chat GUI driving the AgentOS agent
-    ├── buildozer.spec                # Android build config
+├── agentmobile/
+│   ├── main.py                       # Kivy chat GUI driving the AgentOS agent
+│   ├── buildozer.spec                # Android build config
+│   └── README.md
+└── monia/
+    ├── reseau.py                     # From-scratch MLP (backprop, stdlib-only)
+    ├── cerveau.py                    # Lesson 1: the single neuron
+    ├── apprentissage.py              # Lesson 2: learn y = 2x
+    ├── entrainement.py               # Lesson 3: training loop with epochs
+    ├── memoire.py                    # Lesson 4: save/load weights (JSON memory)
+    ├── test_monia.py                 # Tests (pytest + zero-dep runner)
     └── README.md
 ```
 
@@ -312,6 +321,49 @@ other Kivy apps it **reuses nothing** — it is fully self-contained (stdlib
   directly (no module copy). Local UI test: `pip install kivy`, then
   `python netscan/main.py`.
 
+## MonIA (`monia/`)
+
+`monia/` is a **neural network written from scratch**, 100% home-made and
+**stdlib-only** — no numpy, no torch, no tensorflow. It's the next step after the
+user's first phone experiments (a single linear neuron learning `y = 2x`): a real
+multi-layer perceptron trained by backpropagation, capable of learning
+non-linear functions (XOR). Matrices are plain Python lists of lists, so it runs
+anywhere — including Termux on a phone with no `pip install`. Reuses no other
+module; nothing is copied at build time (no APK — it's a CLI/library).
+
+- `reseau.py` — the core. `Reseau(tailles, activation="tanh", sortie="identite",
+  seed=None)` builds an MLP from `tailles=[n_in, n_hidden..., n_out]` with
+  Xavier-ish init. Activations live in the module-level `ACTIVATIONS` dict
+  (`identite`, `sigmoide`, `tanh`, `relu`), each a `(f, df)` pair (value +
+  derivative for backprop). Key methods: `predire(x)` (forward pass),
+  `entrainer(donnees, epochs, taux, rappel)` (gradient descent; `donnees` is a
+  list of `(x, y)`; optional `rappel(epoch, erreur)` progress callback; returns
+  the per-epoch error history), and `sauvegarder(chemin)` / `Reseau.charger(chemin)`
+  — the model's **memory** is its weights, persisted as JSON. `_avant()` returns
+  both pre-activations and activations so `_retropropager()` can compute deltas.
+  Running it directly (`python3 reseau.py`) trains and prints the XOR truth table.
+- Four progressive French teaching scripts, each a lesson that builds on the last:
+  `cerveau.py` (the single neuron `entrée×poids+biais`), `apprentissage.py`
+  (learn `y = 2x`, weight → 2, bias → 0), `entrainement.py` (the same with a
+  visible epoch-by-epoch error decrease, tests `x=10 → 20`), and `memoire.py`
+  (train, save weights to JSON, reload into a fresh network without retraining).
+  Lessons 2–4 import `Reseau` from `reseau.py` by bare name (`monia/` is on
+  `sys.path[0]` when run directly), same convention as `dataguard/`/`agentos/`.
+- `memoire.json` (weights written by `memoire.py`) is git-ignored.
+
+### MonIA tests
+
+```bash
+python -m pytest monia/                 # if pytest is installed
+cd monia && python test_monia.py        # zero-dependency fallback runner
+```
+
+9 tests: weight-matrix shapes, seed reproducibility, activation derivatives,
+learning `y = 2x` (and predicting an unseen `x=10`), error decreasing over
+epochs, learning the non-linear XOR, and save/load round-trip of the memory.
+Same zero-dep runner pattern as the other modules (`tmp_path` via
+`tempfile.TemporaryDirectory`). **No test depends on any external package.**
+
 ## Dependencies
 
 | Package | Required for |
@@ -327,6 +379,8 @@ API through `urllib` (`llm.py`) and stores data in `sqlite3`; only `--voice` add
 the voice packages. `dataguard/` has **zero external dependencies** (pure Python 3
 stdlib: `re`, `pathlib`, `subprocess`, `argparse`, `json`, `dataclasses`, `html`,
 `datetime`, `stat`, plus `hashlib`, `secrets`, `math`, `string` for `toolkit.py`).
+`monia/` likewise has **zero external dependencies** (pure Python 3 stdlib:
+`math`, `random`, `json`) — it runs as-is in Termux/Debian with no `pip install`.
 
 ## Key Architectural Decisions
 

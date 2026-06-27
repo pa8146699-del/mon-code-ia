@@ -36,3 +36,6 @@ savings/bin/
 # Artéfacts de build de NetScan (appli autonome, rien à copier)
 netscan/.buildozer/
 netscan/bin/
+
+# Mémoire entraînée de MonIA (poids créés au lancement de memoire.py)
+monia/memoire.json
