@@ -77,6 +77,7 @@ mon-code-ia/
     ├── github.py                     # Lesson 9: GitHub Q&A assistant (reuses Discussion)
     ├── cyber.py                      # Lesson 10: cybersecurity Q&A assistant (reuses Discussion)
     ├── failles.py                    # Lesson 11: vulnerability-classes Q&A (reuses Discussion)
+    ├── analyseur.py                  # Lesson 12: static code security analyzer (stdlib re)
     ├── monia.py                      # Menu launcher (runs any lesson via subprocess)
     ├── test_monia.py                 # Tests (pytest + zero-dep runner)
     └── README.md
@@ -339,8 +340,10 @@ non-linear functions (XOR). Matrices are plain Python lists of lists, so it runs
 anywhere — including Termux on a phone with no `pip install`. Reuses no other
 module; nothing is copied at build time (no APK — it's a CLI/library). Beyond the
 teaching lessons, it grew a set of practical assistants (chatbot, text generator,
-Python/terminal/GitHub helpers) all built on the same `Reseau`/`Discussion`
-engine and reachable from one menu (`monia.py`).
+Python/terminal/GitHub helpers, plus an educational cybersecurity/vulnerability
+Q&A pair and a stdlib static code-security analyzer) all built on the same
+`Reseau`/`Discussion` engine (except the analyzer, pure `re`) and reachable from
+one menu (`monia.py`).
 
 - `reseau.py` — the core. `Reseau(tailles, activation="tanh", sortie="identite",
   seed=None)` builds an MLP from `tailles=[n_in, n_hidden..., n_out]` with
@@ -433,6 +436,18 @@ engine and reachable from one menu (`monia.py`).
   exploiting real targets, and an entry frames the legal boundary (own systems /
   authorised bug bounty / CTF only). Cross-references `dataguard/`. Auto-loads/saves
   `failles.json`.
+- `analyseur.py` — **lesson 12, a static code security analyzer** (the "find
+  flaws, legally" tool: it scans code the user owns, no remote target). Stdlib
+  `re` only; module-level `REGLES` is a list of `(nom, compiled_regex, severite,
+  conseil, masquer_secret)`. `analyser_texte(texte)` scans line by line and returns
+  finding dicts `{ligne, severite, nom, conseil, extrait}` sorted by line then
+  severity; `analyser_fichier(chemin)` reads a file first. Detects hardcoded
+  secrets, `eval`/`exec`, `os.system`/`popen`/`shell=True`, likely SQL injection,
+  unsafe `pickle`/`yaml.load`, weak `md5`/`sha1`, `verify=False`, insecure `random`
+  for secrets, `http://`, `debug=True`, `tempfile.mktemp`. **Redaction-first** like
+  `dataguard`: `_masquer()` replaces quoted contents with `***` for the secret rule
+  so values never print. Heuristic (regex), so false positives are expected and
+  framed as such. Run with a file arg, or no arg for an interactive paste loop.
 - `monia.py` — **the menu launcher**. A module-level `LECONS` dict maps a menu
   key to `(description, fichier)`; `lancer()` runs the chosen script with
   `subprocess.run([sys.executable, ...])` (inheriting stdin/stdout so the launched
@@ -461,7 +476,8 @@ command helper (well-formed `COMMANDES`, returning the right shell command), the
 GitHub assistant (well-formed `CONNAISSANCES_GITHUB`, explaining cloning), the
 cybersecurity assistant (well-formed `CONNAISSANCES_CYBER`, explaining phishing),
 the vulnerability assistant (well-formed `CONNAISSANCES_FAILLES`, explaining SQL
-injection), and the menu (`LECONS` entries all point to existing files).
+injection), the static analyzer (finds flaws, masks secrets, stays quiet on clean
+code), and the menu (`LECONS` entries all point to existing files).
 Same zero-dep runner pattern as the other modules (`tmp_path` via
 `tempfile.TemporaryDirectory`). **No test depends on any external package.**
 

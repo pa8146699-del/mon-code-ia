@@ -55,10 +55,11 @@ python3 monia.py
     3) Coder en Python     4) Dépanner le terminal
     5) GitHub              6) Cybersécurité
     7) Failles (vulnérabilités)
+    8) Analyser du code (trouver des failles)
   Les leçons (comprendre comment ça marche) :
-    8) Le neurone          9) Apprendre y = 2x
-   10) S'entraîner        11) La mémoire
-   12) Le réseau (XOR)
+    9) Le neurone         10) Apprendre y = 2x
+   11) S'entraîner        12) La mémoire
+   13) Le réseau (XOR)
     t) Lancer les tests    0) Quitter
 ```
 
@@ -79,6 +80,7 @@ Tu tapes un numéro, l'outil se lance ; quand tu le quittes, tu reviens au menu.
 | `github.py` | **9. Connaître GitHub** : cloner, envoyer, branches, tokens, pull requests. |
 | `cyber.py` | **10. Cybersécurité** : comprendre les attaques et savoir se protéger. |
 | `failles.py` | **11. Les failles** : les vulnérabilités (OWASP) et comment les corriger. |
+| `analyseur.py` | **12. L'analyseur** : trouve les failles dans TON code (analyse statique). |
 
 ```bash
 cd monia
@@ -93,6 +95,7 @@ python3 commandes.py      # bloqué dans le terminal ? il te donne la commande
 python3 github.py         # tout ce qu'il faut savoir sur GitHub
 python3 cyber.py          # apprends la cybersécurité (et protège-toi)
 python3 failles.py        # les familles de failles et comment les corriger
+python3 analyseur.py mon_fichier.py   # trouve les failles dans TON code
 ```
 
 ### Le chatbot — `discussion.py`
@@ -288,6 +291,32 @@ homme du milieu, zero-day, redirection ouverte, OWASP Top 10, CVE, bug bounty…
 t'apprend à **reconnaître et corriger** les failles, pas à attaquer des cibles
 réelles.
 
+### L'analyseur — `analyseur.py`
+
+`failles.py` *explique* les failles ; `analyseur.py` les **trouve** dans ton
+code. C'est de l'analyse statique : il lit un fichier (ou un bout de code collé)
+et repère les motifs à risque, avec le risque et la correction. Les secrets sont
+**masqués** (`***`) dans le rapport.
+
+```bash
+python3 analyseur.py mon_fichier.py   # analyse un fichier
+python3 analyseur.py                  # mode interactif (colle du code)
+```
+```
+🛡️  ligne 2 — [HAUTE] Secret en clair
+      > password = "***"
+      → Lis-le depuis une variable d'environnement (os.environ).
+```
+
+Il détecte : secrets en clair, `eval`/`exec`, `os.system`/`shell=True`, injection
+SQL probable, `pickle`/`yaml.load` non sûrs, hachage faible (md5/sha1), TLS
+désactivé (`verify=False`), aléa non sûr (`random` pour un secret), liens `http`,
+`debug=True`, `tempfile.mktemp`.
+
+✅ **100 % légal** : tu analyses **ton** code, sur **ta** machine — aucune cible
+distante. C'est heuristique : il signale des motifs probables, à toi de juger.
+Même esprit que `dataguard/`.
+
 ## Tests
 
 ```bash
@@ -295,7 +324,7 @@ python -m pytest monia/            # si pytest est installé
 cd monia && python3 test_monia.py  # runner zéro-dépendance
 ```
 
-29 tests : formes des poids, reproductibilité de la graine, dérivées des
+32 tests : formes des poids, reproductibilité de la graine, dérivées des
 activations, apprentissage de `y = 2x`, décroissance de l'erreur, apprentissage
 du XOR non-linéaire, sauvegarde/rechargement de la mémoire, le chatbot
 (découpage en mots, réponse à une question apprise, aveu d'ignorance,
@@ -304,8 +333,9 @@ apprentissage en direct, sauvegarde/rechargement), le générateur de texte
 l'assistant de code (base de recettes valide, réponse en Python), le dépanneur
 de commandes (base valide, bonne commande renvoyée), l'assistant GitHub (base
 valide, explique le clonage), l'assistant cybersécurité (base valide, explique le
-phishing), l'assistant failles (base valide, explique l'injection SQL) et le menu
-(chaque entrée pointe vers un fichier existant).
+phishing), l'assistant failles (base valide, explique l'injection SQL),
+l'analyseur de code (trouve les failles, masque les secrets, ne crie pas au loup
+sur du code propre) et le menu (chaque entrée pointe vers un fichier existant).
 
 ## Pourquoi « from scratch » ?
 

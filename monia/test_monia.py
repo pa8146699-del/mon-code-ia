@@ -267,6 +267,36 @@ def test_failles_explique_l_injection_sql():
     assert "sql" in assistant.repondre("c'est quoi l'injection sql").lower()
 
 
+def test_analyseur_trouve_des_failles():
+    import analyseur
+
+    code = (
+        'password = "secret123"\n'
+        'os.system("rm " + x)\n'
+        "h = hashlib.md5(p).hexdigest()\n"
+    )
+    noms = {t["nom"] for t in analyseur.analyser_texte(code)}
+    assert "Secret en clair" in noms
+    assert "Commande shell (os.system/popen)" in noms
+    assert "Hachage faible (md5/sha1)" in noms
+
+
+def test_analyseur_masque_les_secrets():
+    import analyseur
+
+    trouvailles = analyseur.analyser_texte('api_key = "sk-tres-secret-12345"')
+    secret = [t for t in trouvailles if t["nom"] == "Secret en clair"][0]
+    assert "sk-tres-secret-12345" not in secret["extrait"]
+    assert "***" in secret["extrait"]
+
+
+def test_analyseur_code_propre_sans_alerte():
+    import analyseur
+
+    code = "x = 2 + 2\nprint('Bonjour')\n"
+    assert analyseur.analyser_texte(code) == []
+
+
 def test_menu_pointe_vers_des_fichiers_existants():
     import monia
 
