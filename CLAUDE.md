@@ -71,6 +71,7 @@ mon-code-ia/
     ├── entrainement.py               # Lesson 3: training loop with epochs
     ├── memoire.py                    # Lesson 4: save/load weights (JSON memory)
     ├── discussion.py                 # Lesson 5: bag-of-words chatbot (reuses reseau.py)
+    ├── ecrivain.py                   # Lesson 6: Markov text generator (learns a book)
     ├── test_monia.py                 # Tests (pytest + zero-dep runner)
     └── README.md
 ```
@@ -366,8 +367,20 @@ module; nothing is copied at build time (no APK — it's a CLI/library).
   that **auto-loads/saves `chat.json`** and supports live teaching by typing
   `apprends: question = réponse` (and `aide`). **Honest framing:** this is a small
   intent-classifier chatbot, not an LLM — it answers what you teach it.
-- `memoire.json` / `chat.json` (weights written by `memoire.py` / `discussion.py`)
-  are git-ignored.
+- `ecrivain.py` — **lesson 6, a Markov text generator** (the honest answer to
+  "teach it a book": the bag-of-words chatbot learns Q/A pairs, which a book has
+  none of). `Ecrivain(ordre=2)` learns an order-N word model: `jetons()` tokenizes
+  (`\w+|[.,!?;:]`, lowercased), `apprendre_texte()`/`lire_livre(chemin)` count
+  which words follow each N-gram (`modele["w1 w2"] = {next: count}`, plus
+  sentence-start contexts in `debuts`), `generer(amorce, nb_mots, seed)` samples
+  the next word weighted by frequency, `vocabulaire()` is the distinct-word count.
+  `sauvegarder`/`charger` persist to JSON. Run with a `.txt` path argument to learn
+  a real book, or no arg to learn the bundled public-domain `EXEMPLE` (La Fontaine).
+  **Deliberately not a neural net** — Markov is the right, fast, stdlib tool to
+  absorb a whole book's vocabulary; framed as such to the user.
+- `memoire.json` / `chat.json` / `ecrivain.json` (written by `memoire.py` /
+  `discussion.py` / `ecrivain.py`) and `monia/*.txt` (downloaded books) are
+  git-ignored.
 
 ### MonIA tests
 
@@ -376,12 +389,13 @@ python -m pytest monia/                 # if pytest is installed
 cd monia && python test_monia.py        # zero-dependency fallback runner
 ```
 
-14 tests: weight-matrix shapes, seed reproducibility, activation derivatives,
+18 tests: weight-matrix shapes, seed reproducibility, activation derivatives,
 learning `y = 2x` (and predicting an unseen `x=10`), error decreasing over
-epochs, learning the non-linear XOR, save/load round-trip of the memory, plus
-the chatbot (`mots()` tokenizing, answering a learned question, the honest
-"don't know" path on out-of-vocabulary input, live `apprendre()`, and chatbot
-save/load).
+epochs, learning the non-linear XOR, save/load round-trip of the memory, the
+chatbot (`mots()` tokenizing, answering a learned question, the honest "don't
+know" path on out-of-vocabulary input, live `apprendre()`, and chatbot
+save/load), and the text generator (`jetons()` tokenizing, vocabulary learning,
+generation staying within the learned vocabulary, and save/load).
 Same zero-dep runner pattern as the other modules (`tmp_path` via
 `tempfile.TemporaryDirectory`). **No test depends on any external package.**
 

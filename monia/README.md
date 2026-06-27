@@ -49,6 +49,7 @@ cd monia && python3 reseau.py
 | `entrainement.py` | **3. L'entraînement** : voir l'erreur baisser, tester `x=10 → 20`. |
 | `memoire.py` | **4. La mémoire** : sauvegarder/recharger les poids en JSON. |
 | `discussion.py` | **5. Discuter** : un chatbot qui apprend des mots pour répondre. |
+| `ecrivain.py` | **6. Lire un livre** : apprend tout le vocabulaire d'un texte et écrit. |
 
 ```bash
 cd monia
@@ -57,6 +58,7 @@ python3 apprentissage.py
 python3 entrainement.py
 python3 memoire.py
 python3 discussion.py     # discute avec ton IA (tape 'quitter' pour sortir)
+python3 ecrivain.py       # lit un texte d'exemple et écrit dans son style
 ```
 
 ### Le chatbot — `discussion.py`
@@ -103,6 +105,31 @@ chat.sauvegarder("chat.json")                          # garde ce qu'elle a appr
 Si aucun mot de ta question n'est connu, elle répond honnêtement
 « Je ne sais pas encore répondre à ça. Apprends-le moi ! ».
 
+### Apprendre un livre — `ecrivain.py`
+
+Le chatbot apprend des paires question/réponse ; **un livre n'en contient pas**.
+Pour « avaler » un livre entier et en connaître tout le vocabulaire, c'est une
+autre technique : un **générateur de texte** (modèle de Markov). Il lit le texte,
+retient quels mots suivent quels autres, puis écrit dans le même style.
+
+```bash
+python3 ecrivain.py mon_livre.txt   # apprend ton livre
+python3 ecrivain.py                 # apprend un texte d'exemple (La Fontaine)
+```
+
+Puis donne-lui un ou deux mots de départ et il continue tout seul.
+
+**Où trouver des livres gratuits (.txt)** — le [Projet Gutenberg](https://www.gutenberg.org)
+(livres libres de droits). Sur la fiche d'un livre, choisis le format
+**« Plain Text UTF-8 »** et enregistre-le en `.txt`. Quelques idées en français :
+Jules Verne, Victor Hugo, Alexandre Dumas, les fables de La Fontaine, les contes
+de Perrault. Conseil : **commence par un texte court** (un conte, des fables) — il
+apprend plus vite et écrit plus joliment qu'avec un énorme roman. Tu peux aussi
+coller n'importe quel texte (chanson, article) dans un fichier `.txt`.
+
+Ce n'est **pas** un réseau de neurones (c'est statistique), mais c'est l'outil
+adapté pour apprendre beaucoup de mots d'un coup, et ça reste 100 % stdlib.
+
 ## Tests
 
 ```bash
@@ -110,11 +137,12 @@ python -m pytest monia/            # si pytest est installé
 cd monia && python3 test_monia.py  # runner zéro-dépendance
 ```
 
-14 tests : formes des poids, reproductibilité de la graine, dérivées des
+18 tests : formes des poids, reproductibilité de la graine, dérivées des
 activations, apprentissage de `y = 2x`, décroissance de l'erreur, apprentissage
-du XOR non-linéaire, sauvegarde/rechargement de la mémoire, et le chatbot
+du XOR non-linéaire, sauvegarde/rechargement de la mémoire, le chatbot
 (découpage en mots, réponse à une question apprise, aveu d'ignorance,
-apprentissage en direct, sauvegarde/rechargement).
+apprentissage en direct, sauvegarde/rechargement), et le générateur de texte
+(découpage, apprentissage du vocabulaire, génération, sauvegarde/rechargement).
 
 ## Pourquoi « from scratch » ?
 

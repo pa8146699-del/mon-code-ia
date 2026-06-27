@@ -10,6 +10,7 @@ directement le réseau de neurones maison (`reseau.py`).
 from pathlib import Path
 
 from discussion import Discussion, mots
+from ecrivain import Ecrivain, jetons
 from reseau import ACTIVATIONS, Reseau
 
 
@@ -136,6 +137,39 @@ def test_chatbot_sauvegarder_et_charger(tmp_path: Path):
 
     rechargee = Discussion.charger(chemin)
     assert rechargee.repondre("bonjour") == chat.repondre("bonjour")
+
+
+# --- Générateur de texte (leçon 6) ------------------------------------------
+
+def test_jetons_separe_mots_et_ponctuation():
+    assert jetons("Bonjour, le monde !") == ["bonjour", ",", "le", "monde", "!"]
+
+
+def test_ecrivain_apprend_le_vocabulaire():
+    ec = Ecrivain(ordre=2)
+    ec.apprendre_texte("le chat dort. le chien court. le chat court.")
+    # mots distincts : le, chat, dort, ., chien, court  -> 6
+    assert ec.vocabulaire() == 6
+
+
+def test_ecrivain_genere_du_texte_appris():
+    ec = Ecrivain(ordre=1)
+    ec.apprendre_texte("le chat mange la souris.")
+    texte = ec.generer(amorce="le", nb_mots=5, seed=0)
+    assert len(texte) > 0
+    # Chaque mot produit fait partie du vocabulaire du texte appris.
+    for mot in jetons(texte):
+        assert mot in ec._mots
+
+
+def test_ecrivain_sauvegarder_et_charger(tmp_path: Path):
+    ec = Ecrivain(ordre=2)
+    ec.apprendre_texte("maître corbeau sur un arbre perché tenait un fromage.")
+    chemin = tmp_path / "ecrivain.json"
+    ec.sauvegarder(chemin)
+    recharge = Ecrivain.charger(chemin)
+    assert recharge.vocabulaire() == ec.vocabulaire()
+    assert recharge.generer(seed=1) == ec.generer(seed=1)
 
 
 if __name__ == "__main__":
