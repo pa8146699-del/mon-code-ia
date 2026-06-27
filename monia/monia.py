@@ -22,12 +22,13 @@ LECONS = {
     "4": ("Dépanner le terminal", "commandes.py"),
     "5": ("Tout savoir sur GitHub", "github.py"),
     "6": ("Cybersécurité", "cyber.py"),
+    "7": ("Failles (vulnérabilités)", "failles.py"),
     # Les leçons (comprendre comment l'IA fonctionne)
-    "7": ("Leçon : le neurone", "cerveau.py"),
-    "8": ("Leçon : apprendre y = 2x", "apprentissage.py"),
-    "9": ("Leçon : s'entraîner (epochs)", "entrainement.py"),
-    "10": ("Leçon : la mémoire", "memoire.py"),
-    "11": ("Leçon : le réseau (XOR)", "reseau.py"),
+    "8": ("Leçon : le neurone", "cerveau.py"),
+    "9": ("Leçon : apprendre y = 2x", "apprentissage.py"),
+    "10": ("Leçon : s'entraîner (epochs)", "entrainement.py"),
+    "11": ("Leçon : la mémoire", "memoire.py"),
+    "12": ("Leçon : le réseau (XOR)", "reseau.py"),
     # Vérifier que tout marche
     "t": ("Lancer les tests", "test_monia.py"),
 }
@@ -39,10 +40,11 @@ def afficher_menu():
     print("    1) Discuter            2) Écrire un texte")
     print("    3) Coder en Python     4) Dépanner le terminal")
     print("    5) GitHub              6) Cybersécurité")
+    print("    7) Failles (vulnérabilités)")
     print("  Les leçons (comprendre comment ça marche) :")
-    print("    7) Le neurone          8) Apprendre y = 2x")
-    print("    9) S'entraîner        10) La mémoire")
-    print("   11) Le réseau (XOR)")
+    print("    8) Le neurone          9) Apprendre y = 2x")
+    print("   10) S'entraîner        11) La mémoire")
+    print("   12) Le réseau (XOR)")
     print("    t) Lancer les tests    0) Quitter")
 
 

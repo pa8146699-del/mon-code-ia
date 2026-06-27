@@ -250,6 +250,23 @@ def test_cyber_explique_le_phishing():
     assert "phishing" in assistant.repondre("c'est quoi le phishing").lower()
 
 
+def test_failles_base_valide():
+    import failles
+
+    assert len(failles.CONNAISSANCES_FAILLES) >= 15
+    for question, explication in failles.CONNAISSANCES_FAILLES:
+        assert isinstance(question, str) and question
+        assert isinstance(explication, str) and explication
+
+
+def test_failles_explique_l_injection_sql():
+    import failles
+
+    assistant = Discussion(failles.CONNAISSANCES_FAILLES, cachees=20, seed=0)
+    assistant.entrainer(epochs=2000, taux=0.3)
+    assert "sql" in assistant.repondre("c'est quoi l'injection sql").lower()
+
+
 def test_menu_pointe_vers_des_fichiers_existants():
     import monia
 

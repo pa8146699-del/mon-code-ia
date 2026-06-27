@@ -54,10 +54,11 @@ python3 monia.py
     1) Discuter            2) Écrire un texte
     3) Coder en Python     4) Dépanner le terminal
     5) GitHub              6) Cybersécurité
+    7) Failles (vulnérabilités)
   Les leçons (comprendre comment ça marche) :
-    7) Le neurone          8) Apprendre y = 2x
-    9) S'entraîner        10) La mémoire
-   11) Le réseau (XOR)
+    8) Le neurone          9) Apprendre y = 2x
+   10) S'entraîner        11) La mémoire
+   12) Le réseau (XOR)
     t) Lancer les tests    0) Quitter
 ```
 
@@ -77,6 +78,7 @@ Tu tapes un numéro, l'outil se lance ; quand tu le quittes, tu reviens au menu.
 | `commandes.py` | **8. Le dépanneur** : les bonnes commandes du terminal quand tu bloques. |
 | `github.py` | **9. Connaître GitHub** : cloner, envoyer, branches, tokens, pull requests. |
 | `cyber.py` | **10. Cybersécurité** : comprendre les attaques et savoir se protéger. |
+| `failles.py` | **11. Les failles** : les vulnérabilités (OWASP) et comment les corriger. |
 
 ```bash
 cd monia
@@ -90,6 +92,7 @@ python3 codeur.py         # pose une question, il répond en Python
 python3 commandes.py      # bloqué dans le terminal ? il te donne la commande
 python3 github.py         # tout ce qu'il faut savoir sur GitHub
 python3 cyber.py          # apprends la cybersécurité (et protège-toi)
+python3 failles.py        # les familles de failles et comment les corriger
 ```
 
 ### Le chatbot — `discussion.py`
@@ -261,6 +264,30 @@ l'utiliser contre les systèmes des autres ne l'est pas. Pour pratiquer le hacki
 légalement ». Il complète bien `dataguard/`, la vraie boîte à outils défensive du
 projet.
 
+### Les failles — `failles.py`
+
+Connaître les grandes familles de vulnérabilités (façon **OWASP**) : pour
+chacune, ce que c'est, le risque, et **comment la corriger**.
+
+```bash
+python3 failles.py
+```
+```
+Toi : c'est quoi l'injection sql
+MonIA : L'injection SQL arrive quand une entrée non filtrée est insérée dans une
+        requête… Défense : requêtes paramétrées, valider les entrées.
+```
+
+Il couvre : injection SQL, XSS, CSRF, contrôle d'accès cassé, mauvaise
+configuration, identifiants par défaut, secrets en clair, composants obsolètes,
+débordement de tampon, RCE, path traversal, SSRF, élévation de privilèges, DoS,
+homme du milieu, zero-day, redirection ouverte, OWASP Top 10, CVE, bug bounty…
+
+⚠️ **Légal** : chercher des failles n'est autorisé que sur **tes** systèmes, en
+**bug bounty** autorisé, ou sur des **CTF**. Cet assistant est conceptuel : il
+t'apprend à **reconnaître et corriger** les failles, pas à attaquer des cibles
+réelles.
+
 ## Tests
 
 ```bash
@@ -268,7 +295,7 @@ python -m pytest monia/            # si pytest est installé
 cd monia && python3 test_monia.py  # runner zéro-dépendance
 ```
 
-27 tests : formes des poids, reproductibilité de la graine, dérivées des
+29 tests : formes des poids, reproductibilité de la graine, dérivées des
 activations, apprentissage de `y = 2x`, décroissance de l'erreur, apprentissage
 du XOR non-linéaire, sauvegarde/rechargement de la mémoire, le chatbot
 (découpage en mots, réponse à une question apprise, aveu d'ignorance,
@@ -277,7 +304,8 @@ apprentissage en direct, sauvegarde/rechargement), le générateur de texte
 l'assistant de code (base de recettes valide, réponse en Python), le dépanneur
 de commandes (base valide, bonne commande renvoyée), l'assistant GitHub (base
 valide, explique le clonage), l'assistant cybersécurité (base valide, explique le
-phishing) et le menu (chaque entrée pointe vers un fichier existant).
+phishing), l'assistant failles (base valide, explique l'injection SQL) et le menu
+(chaque entrée pointe vers un fichier existant).
 
 ## Pourquoi « from scratch » ?
 
