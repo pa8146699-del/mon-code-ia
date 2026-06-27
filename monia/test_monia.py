@@ -233,6 +233,23 @@ def test_github_explique_le_clonage():
 
 # --- Menu principal (leçon 0) -----------------------------------------------
 
+def test_cyber_base_valide():
+    import cyber
+
+    assert len(cyber.CONNAISSANCES_CYBER) >= 15
+    for question, explication in cyber.CONNAISSANCES_CYBER:
+        assert isinstance(question, str) and question
+        assert isinstance(explication, str) and explication
+
+
+def test_cyber_explique_le_phishing():
+    import cyber
+
+    assistant = Discussion(cyber.CONNAISSANCES_CYBER, cachees=20, seed=0)
+    assistant.entrainer(epochs=2000, taux=0.3)
+    assert "phishing" in assistant.repondre("c'est quoi le phishing").lower()
+
+
 def test_menu_pointe_vers_des_fichiers_existants():
     import monia
 

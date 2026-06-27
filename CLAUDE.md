@@ -75,6 +75,7 @@ mon-code-ia/
     ├── codeur.py                     # Lesson 7: Python-coding assistant (reuses Discussion)
     ├── commandes.py                  # Lesson 8: terminal-command helper (reuses Discussion)
     ├── github.py                     # Lesson 9: GitHub Q&A assistant (reuses Discussion)
+    ├── cyber.py                      # Lesson 10: cybersecurity Q&A assistant (reuses Discussion)
     ├── monia.py                      # Menu launcher (runs any lesson via subprocess)
     ├── test_monia.py                 # Tests (pytest + zero-dep runner)
     └── README.md
@@ -410,14 +411,24 @@ engine and reachable from one menu (`monia.py`).
   prints command answers as `$ cmd` (detected via `_DEBUTS_COMMANDE`) and
   explanation answers as plain text. Auto-loads/saves `github.json`; live teaching
   via `apprends: question >>> réponse`.
+- `cyber.py` — **lesson 10, a cybersecurity Q&A assistant** (educational/defensive).
+  Same `Discussion` engine; `CONNAISSANCES_CYBER` explains attacks *and* defenses
+  (phishing, malware/ransomware/trojan, firewall, VPN, encryption, HTTPS, social
+  engineering, brute force, keylogger, data breach, 2FA, password hygiene, dark
+  web) plus the ethics/legality framing (attacking systems without authorization
+  is illegal; practice legally on your own machines or CTFs). Cross-references the
+  repo's real defensive toolkit `dataguard/`. Deliberately conceptual — it does
+  **not** emit ready-to-run malware or operational attack instructions; the module
+  docstring and a `est-ce légal de pirater` / `comment apprendre le hacking
+  légalement` entry keep the framing explicit. Auto-loads/saves `cyber.json`.
 - `monia.py` — **the menu launcher**. A module-level `LECONS` dict maps a menu
   key to `(description, fichier)`; `lancer()` runs the chosen script with
   `subprocess.run([sys.executable, ...])` (inheriting stdin/stdout so the launched
   tool stays interactive) and returns to the menu when it exits. The single
   no-name-to-remember entry point for everything above.
 - `memoire.json` / `chat.json` / `ecrivain.json` / `codeur.json` / `commandes.json`
-  / `github.json` (written by the matching lesson scripts) and `monia/*.txt`
-  (downloaded books) are git-ignored.
+  / `github.json` / `cyber.json` (written by the matching lesson scripts) and
+  `monia/*.txt` (downloaded books) are git-ignored.
 
 ### MonIA tests
 
@@ -435,8 +446,9 @@ save/load), the text generator (`jetons()` tokenizing, vocabulary learning,
 generation staying within the learned vocabulary, and save/load), the coding
 assistant (well-formed `CONNAISSANCES_CODE`, answering with Python), the
 command helper (well-formed `COMMANDES`, returning the right shell command), the
-GitHub assistant (well-formed `CONNAISSANCES_GITHUB`, explaining cloning), and
-the menu (`LECONS` entries all point to existing files).
+GitHub assistant (well-formed `CONNAISSANCES_GITHUB`, explaining cloning), the
+cybersecurity assistant (well-formed `CONNAISSANCES_CYBER`, explaining phishing),
+and the menu (`LECONS` entries all point to existing files).
 Same zero-dep runner pattern as the other modules (`tmp_path` via
 `tempfile.TemporaryDirectory`). **No test depends on any external package.**
 

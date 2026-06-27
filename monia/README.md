@@ -53,11 +53,11 @@ python3 monia.py
   Les assistants (pose des questions) :
     1) Discuter            2) Écrire un texte
     3) Coder en Python     4) Dépanner le terminal
-    5) GitHub
+    5) GitHub              6) Cybersécurité
   Les leçons (comprendre comment ça marche) :
-    6) Le neurone          7) Apprendre y = 2x
-    8) S'entraîner         9) La mémoire
-   10) Le réseau (XOR)
+    7) Le neurone          8) Apprendre y = 2x
+    9) S'entraîner        10) La mémoire
+   11) Le réseau (XOR)
     t) Lancer les tests    0) Quitter
 ```
 
@@ -76,6 +76,7 @@ Tu tapes un numéro, l'outil se lance ; quand tu le quittes, tu reviens au menu.
 | `codeur.py` | **7. Apprendre à coder** : répond à tes questions avec du code Python. |
 | `commandes.py` | **8. Le dépanneur** : les bonnes commandes du terminal quand tu bloques. |
 | `github.py` | **9. Connaître GitHub** : cloner, envoyer, branches, tokens, pull requests. |
+| `cyber.py` | **10. Cybersécurité** : comprendre les attaques et savoir se protéger. |
 
 ```bash
 cd monia
@@ -88,6 +89,7 @@ python3 ecrivain.py       # lit un texte d'exemple et écrit dans son style
 python3 codeur.py         # pose une question, il répond en Python
 python3 commandes.py      # bloqué dans le terminal ? il te donne la commande
 python3 github.py         # tout ce qu'il faut savoir sur GitHub
+python3 cyber.py          # apprends la cybersécurité (et protège-toi)
 ```
 
 ### Le chatbot — `discussion.py`
@@ -236,6 +238,29 @@ pull, dépôt, pull request, `.gitignore`) et **comment se connecter avec un tok
 (GitHub n'accepte plus le mot de passe). Apprends-lui tes astuces avec
 `apprends: ta question >>> ta réponse` (mémoire dans `github.json`).
 
+### Cybersécurité — `cyber.py`
+
+Apprends la cybersécurité : il explique les attaques (phishing, malware,
+ransomware, force brute, ingénierie sociale…) **et** comment t'en protéger (bons
+mots de passe, 2FA, sauvegardes, HTTPS, VPN, mises à jour).
+
+```bash
+python3 cyber.py
+```
+```
+Toi : c'est quoi le phishing
+MonIA : Le phishing (hameçonnage) est un faux message qui imite une vraie
+        entreprise pour te pousser à donner ton mot de passe… (indices : urgence,
+        adresse bizarre, lien trompeur). Ton outil dataguard sait les détecter.
+```
+
+⚠️ **Éthique & légalité** : comprendre une attaque est légal et utile ;
+l'utiliser contre les systèmes des autres ne l'est pas. Pour pratiquer le hacking
+« sans limite » légalement, fais-le sur **tes propres machines** ou sur des
+**CTF** (Capture The Flag) — demande-lui « comment apprendre le hacking
+légalement ». Il complète bien `dataguard/`, la vraie boîte à outils défensive du
+projet.
+
 ## Tests
 
 ```bash
@@ -243,7 +268,7 @@ python -m pytest monia/            # si pytest est installé
 cd monia && python3 test_monia.py  # runner zéro-dépendance
 ```
 
-25 tests : formes des poids, reproductibilité de la graine, dérivées des
+27 tests : formes des poids, reproductibilité de la graine, dérivées des
 activations, apprentissage de `y = 2x`, décroissance de l'erreur, apprentissage
 du XOR non-linéaire, sauvegarde/rechargement de la mémoire, le chatbot
 (découpage en mots, réponse à une question apprise, aveu d'ignorance,
@@ -251,8 +276,8 @@ apprentissage en direct, sauvegarde/rechargement), le générateur de texte
 (découpage, apprentissage du vocabulaire, génération, sauvegarde/rechargement),
 l'assistant de code (base de recettes valide, réponse en Python), le dépanneur
 de commandes (base valide, bonne commande renvoyée), l'assistant GitHub (base
-valide, explique le clonage) et le menu (chaque entrée pointe vers un fichier
-existant).
+valide, explique le clonage), l'assistant cybersécurité (base valide, explique le
+phishing) et le menu (chaque entrée pointe vers un fichier existant).
 
 ## Pourquoi « from scratch » ?
 
