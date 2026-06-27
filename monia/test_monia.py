@@ -118,6 +118,15 @@ def test_chatbot_avoue_ne_pas_savoir():
     assert "ne sais pas" in chat.repondre("xyzzy plugh").lower()
 
 
+def test_chatbot_apprend_en_direct():
+    # Enseignement à la volée : une nouvelle paire, et elle sait répondre.
+    chat = Discussion([("bonjour", "Salut !")], seed=0)
+    chat.entrainer(epochs=1000, taux=0.3)
+    assert "ne sais pas" in chat.repondre("la capitale de la france").lower()
+    chat.apprendre("quelle est la capitale de la France", "Paris")
+    assert chat.repondre("la capitale de la france ?") == "Paris"
+
+
 def test_chatbot_sauvegarder_et_charger(tmp_path: Path):
     paires = [("bonjour", "Salut !"), ("au revoir", "À bientôt.")]
     chat = Discussion(paires, seed=0)

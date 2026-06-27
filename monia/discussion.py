@@ -37,31 +37,43 @@ class Discussion:
     """Un petit chatbot : il apprend des couples (question, réponse)."""
 
     def __init__(self, paires, cachees=10, seed=0):
-        # paires : liste de (question, réponse).
-        questions = [q for q, _ in paires]
-        self.reponses = [r for _, r in paires]
+        self._cachees = cachees
+        self._seed = seed
+        self._construire(paires)
+
+    def _construire(self, paires):
+        """(Re)construit le vocabulaire, les classes et le réseau depuis `paires`."""
+        self._paires = list(paires)
 
         # Vocabulaire : tous les mots vus dans les questions (sans doublon).
         self.vocab = []
-        for q in questions:
-            for m in mots(q):
+        for question, _ in self._paires:
+            for m in mots(question):
                 if m not in self.vocab:
                     self.vocab.append(m)
 
         # Classes : les réponses distinctes possibles.
         self.classes = []
-        for r in self.reponses:
-            if r not in self.classes:
-                self.classes.append(r)
+        for _, reponse in self._paires:
+            if reponse not in self.classes:
+                self.classes.append(reponse)
 
         # Le réseau : sac-de-mots en entrée -> une réponse en sortie.
         self.reseau = Reseau(
-            [len(self.vocab), cachees, len(self.classes)],
+            [len(self.vocab), self._cachees, len(self.classes)],
             activation="tanh",
             sortie="sigmoide",
-            seed=seed,
+            seed=self._seed,
         )
-        self._paires = list(paires)
+
+    def apprendre(self, question, reponse, epochs=3000, taux=0.3):
+        """Ajoute un couple (question, réponse) et réapprend tout de suite.
+
+        Comme un nouveau mot ou une nouvelle réponse change la taille du réseau,
+        on le reconstruit puis on le réentraîne sur l'ensemble des exemples.
+        """
+        self._construire(self._paires + [(question, reponse)])
+        return self.entrainer(epochs, taux)
 
     def _encoder(self, phrase):
         """Transforme une phrase en vecteur sac-de-mots (des 0 et des 1)."""
@@ -141,21 +153,58 @@ CONNAISSANCES = [
 ]
 
 
+FICHIER = os.path.join(os.path.dirname(__file__), "chat.json")
+
+AIDE = (
+    "Pour m'apprendre une réponse, écris :  apprends: ta question = ma réponse\n"
+    "  exemple :  apprends: quelle est la capitale de la France = Paris\n"
+    "Autres commandes :  aide  (revoir ceci)   |   quitter  (arrêter)"
+)
+
+
 if __name__ == "__main__":
-    print("J'apprends mes connaissances de départ...")
-    chat = Discussion(CONNAISSANCES, seed=0)
-    chat.entrainer(epochs=3000, taux=0.3)
-    print("Prête ! Pose-moi une question (tape 'quitter' pour arrêter).\n")
+    # Si elle a déjà appris des choses la dernière fois, on les recharge.
+    if os.path.exists(FICHIER):
+        chat = Discussion.charger(FICHIER)
+        print("J'ai rechargé tout ce que tu m'as appris. 🧠")
+    else:
+        print("J'apprends mes connaissances de départ...")
+        chat = Discussion(CONNAISSANCES, seed=0)
+        chat.entrainer(epochs=3000, taux=0.3)
+        chat.sauvegarder(FICHIER)
+
+    print("Prête ! " + AIDE + "\n")
 
     while True:
         try:
-            question = input("Toi : ").strip()
+            phrase = input("Toi : ").strip()
         except (EOFError, KeyboardInterrupt):
             print("\nMonIA : Au revoir !")
             break
-        if question.lower() in {"quitter", "stop", "exit", "quit"}:
+
+        if phrase.lower() in {"quitter", "stop", "exit", "quit"}:
             print("MonIA : Au revoir !")
             break
-        if not question:
+        if not phrase:
             continue
-        print(f"MonIA : {chat.repondre(question)}")
+        if phrase.lower() in {"aide", "help", "?"}:
+            print("MonIA :\n" + AIDE)
+            continue
+
+        # Enseignement en direct : "apprends: question = réponse"
+        if phrase.lower().startswith("apprends"):
+            corps = phrase.split(":", 1)[1] if ":" in phrase else ""
+            if "=" not in corps:
+                print("MonIA : Dis-moi plutôt :  apprends: ta question = ma réponse")
+                continue
+            question, reponse = corps.split("=", 1)
+            question, reponse = question.strip(), reponse.strip()
+            if not question or not reponse:
+                print("MonIA : Il me faut une question ET une réponse.")
+                continue
+            chat.apprendre(question, reponse)
+            chat.sauvegarder(FICHIER)  # je le retiens pour la prochaine fois
+            print(f"MonIA : Compris ! Désormais à « {question} » je répondrai « {reponse} ».")
+            continue
+
+        print(f"MonIA : {chat.repondre(phrase)}")

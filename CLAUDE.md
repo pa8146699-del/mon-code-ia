@@ -357,11 +357,15 @@ module; nothing is copied at build time (no APK — it's a CLI/library).
   activation="tanh", sortie="sigmoide")`. `_encoder()` maps a phrase to a
   bag-of-words vector; `entrainer()` fits one-hot answer targets; `repondre()`
   returns the argmax answer (or an honest "I don't know yet" when no question
-  word is in the vocab, or the top score is below `seuil`). `sauvegarder`/`charger`
-  persist everything (pairs + vocab + classes + weights) to one JSON. The default
-  `CONNAISSANCES` knowledge base makes `python3 discussion.py` an interactive
-  French chat loop (same exit keywords as `jarvis`). **Honest framing:** this is a
-  small intent-classifier chatbot, not an LLM — it answers what you teach it.
+  word is in the vocab, or the top score is below `seuil`). `apprendre(question,
+  reponse)` appends a pair and rebuilds+retrains the net (a new word/class changes
+  the layer sizes, so `_construire()` rebuilds from the full pair list).
+  `sauvegarder`/`charger` persist everything (pairs + vocab + classes + weights)
+  to one JSON. The default `CONNAISSANCES` knowledge base makes `python3
+  discussion.py` an interactive French chat loop (same exit keywords as `jarvis`)
+  that **auto-loads/saves `chat.json`** and supports live teaching by typing
+  `apprends: question = réponse` (and `aide`). **Honest framing:** this is a small
+  intent-classifier chatbot, not an LLM — it answers what you teach it.
 - `memoire.json` / `chat.json` (weights written by `memoire.py` / `discussion.py`)
   are git-ignored.
 
@@ -372,11 +376,12 @@ python -m pytest monia/                 # if pytest is installed
 cd monia && python test_monia.py        # zero-dependency fallback runner
 ```
 
-13 tests: weight-matrix shapes, seed reproducibility, activation derivatives,
+14 tests: weight-matrix shapes, seed reproducibility, activation derivatives,
 learning `y = 2x` (and predicting an unseen `x=10`), error decreasing over
 epochs, learning the non-linear XOR, save/load round-trip of the memory, plus
 the chatbot (`mots()` tokenizing, answering a learned question, the honest
-"don't know" path on out-of-vocabulary input, and chatbot save/load).
+"don't know" path on out-of-vocabulary input, live `apprendre()`, and chatbot
+save/load).
 Same zero-dep runner pattern as the other modules (`tmp_path` via
 `tempfile.TemporaryDirectory`). **No test depends on any external package.**
 

@@ -70,9 +70,22 @@ Comment ça marche : chaque phrase est découpée en mots (le vocabulaire), puis
 transformée en un vecteur « sac de mots » (1 = mot présent, 0 = absent). Le
 réseau de `reseau.py` apprend à associer ce vecteur à la bonne réponse.
 
-Lui apprendre TES questions : ajoute des couples `("question", "réponse")` dans
-la liste `CONNAISSANCES` de `discussion.py` (donne plusieurs formulations d'une
-même question pour qu'elle généralise mieux), ou passe ta propre liste :
+**Lui apprendre en parlant (le plus simple, sans toucher au code)** : pendant la
+discussion, écris simplement
+
+```
+apprends: ta question = ta réponse
+```
+
+par exemple `apprends: quelle est la capitale de la France = Paris`. Elle
+l'apprend tout de suite **et le retient** : tout est sauvegardé dans `chat.json`
+et rechargé automatiquement au prochain lancement. Tape `aide` pour revoir les
+commandes.
+
+Lui apprendre dans le code : tu peux aussi ajouter des couples
+`("question", "réponse")` dans la liste `CONNAISSANCES` de `discussion.py`, ou
+passer ta propre liste (donne plusieurs formulations d'une même question pour
+qu'elle généralise mieux) :
 
 ```python
 from discussion import Discussion
@@ -97,11 +110,11 @@ python -m pytest monia/            # si pytest est installé
 cd monia && python3 test_monia.py  # runner zéro-dépendance
 ```
 
-13 tests : formes des poids, reproductibilité de la graine, dérivées des
+14 tests : formes des poids, reproductibilité de la graine, dérivées des
 activations, apprentissage de `y = 2x`, décroissance de l'erreur, apprentissage
 du XOR non-linéaire, sauvegarde/rechargement de la mémoire, et le chatbot
 (découpage en mots, réponse à une question apprise, aveu d'ignorance,
-sauvegarde/rechargement).
+apprentissage en direct, sauvegarde/rechargement).
 
 ## Pourquoi « from scratch » ?
 
