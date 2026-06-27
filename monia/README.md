@@ -56,10 +56,13 @@ python3 monia.py
     5) GitHub              6) Cybersécurité
     7) Failles (vulnérabilités)
     8) Analyser du code (trouver des failles)
+  Les outils pratiques :
+    9) Calculatrice       10) Mini-CTF (hacking légal)
+   11) Outils mots de passe
   Les leçons (comprendre comment ça marche) :
-    9) Le neurone         10) Apprendre y = 2x
-   11) S'entraîner        12) La mémoire
-   13) Le réseau (XOR)
+   12) Le neurone         13) Apprendre y = 2x
+   14) S'entraîner        15) La mémoire
+   16) Le réseau (XOR)
     t) Lancer les tests    0) Quitter
 ```
 
@@ -101,6 +104,9 @@ Sur un PC sans `termux-tts-speak`, la voix est simplement ignorée (aucune erreu
 | `cyber.py` | **10. Cybersécurité** : comprendre les attaques et savoir se protéger. |
 | `failles.py` | **11. Les failles** : les vulnérabilités (OWASP) et comment les corriger. |
 | `analyseur.py` | **12. L'analyseur** : trouve les failles dans TON code (analyse statique). |
+| `calculatrice.py` | **Outil.** Comprend tes calculs en français et les **calcule** (sûr, sans eval). |
+| `ctf.py` | **Outil.** Mini-CTF : des défis de hacking **légaux** avec des points. |
+| `motdepasse.py` | **Outil.** Génère un mot de passe fort et **teste** la force du tien. |
 
 ```bash
 cd monia
@@ -116,6 +122,9 @@ python3 github.py         # tout ce qu'il faut savoir sur GitHub
 python3 cyber.py          # apprends la cybersécurité (et protège-toi)
 python3 failles.py        # les familles de failles et comment les corriger
 python3 analyseur.py mon_fichier.py   # trouve les failles dans TON code
+python3 calculatrice.py   # "combien font 12 fois 8 ?" -> 96
+python3 ctf.py            # des défis de hacking légaux, avec des points
+python3 motdepasse.py     # génère / teste des mots de passe
 ```
 
 ### Le chatbot — `discussion.py`
@@ -341,6 +350,44 @@ fichiers texte récursivement, en sautant `.git`, `__pycache__`, etc.
 distante. C'est heuristique : il signale des motifs probables, à toi de juger.
 Même esprit que `dataguard/`.
 
+## Les outils pratiques
+
+### Calculatrice intelligente — `calculatrice.py`
+
+Elle **calcule vraiment** (pas comme le chatbot qui restitue ce qu'on lui
+apprend). Tu écris en français :
+
+```
+Toi : combien font 12 fois 8 ?
+MonIA : = 96
+Toi : racine de 144
+MonIA : = 12
+```
+
+Sûre : elle n'utilise **pas** `eval()` (ce serait une faille). Elle lit
+l'expression avec le module `ast`, qui n'autorise que des nombres et `+ - * / ** %`.
+
+### Mini-CTF — `ctf.py`
+
+Un jeu de cybersécurité **légal** : des énigmes à décoder (chiffre de César,
+Base64, binaire, message à l'envers, acrostiche), chacune rapporte des points.
+Tape `indice` pour de l'aide, `passer` pour le défi suivant. Tu joues sur ton
+téléphone, tu n'attaques personne.
+
+### Outils mots de passe — `motdepasse.py`
+
+```
+Toi : genere 20
+MonIA : voici un mot de passe fort :
+   Mld1LgGfe^?FRggF6MlAW
+   force = excellent (~149 bits d'entropie)
+Toi : teste: 123456
+MonIA : force = très faible — ce mot de passe est dans la liste des plus courants !
+```
+
+`generer()` utilise le module `secrets` (le bon, pas `random`) ; `force()` calcule
+l'entropie en bits et donne des conseils. Même esprit que `dataguard/toolkit.py`.
+
 ## Tests
 
 ```bash
@@ -348,7 +395,7 @@ python -m pytest monia/            # si pytest est installé
 cd monia && python3 test_monia.py  # runner zéro-dépendance
 ```
 
-34 tests : formes des poids, reproductibilité de la graine, dérivées des
+41 tests : formes des poids, reproductibilité de la graine, dérivées des
 activations, apprentissage de `y = 2x`, décroissance de l'erreur, apprentissage
 du XOR non-linéaire, sauvegarde/rechargement de la mémoire, le chatbot
 (découpage en mots, réponse à une question apprise, aveu d'ignorance,
@@ -359,8 +406,10 @@ de commandes (base valide, bonne commande renvoyée), l'assistant GitHub (base
 valide, explique le clonage), l'assistant cybersécurité (base valide, explique le
 phishing), l'assistant failles (base valide, explique l'injection SQL),
 l'analyseur de code (trouve les failles, masque les secrets, ne crie pas au loup
-sur du code propre, analyse un dossier), `liste`/`oublie` du chatbot, et le menu
-(chaque entrée pointe vers un fichier existant).
+sur du code propre, analyse un dossier), `liste`/`oublie` du chatbot, la
+calculatrice (calculs justes, sûre, refuse le non-calcul), le mini-CTF (César,
+défis cohérents), les mots de passe (génération, force) et le menu (chaque entrée
+pointe vers un fichier existant).
 
 ## Pourquoi « from scratch » ?
 

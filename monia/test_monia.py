@@ -322,6 +322,78 @@ def test_analyseur_dossier(tmp_path: Path):
     assert "propre.py" not in fichiers
 
 
+# --- Calculatrice ----------------------------------------------------------
+
+def test_calculatrice_calculs_simples():
+    import calculatrice
+
+    assert calculatrice.repondre("combien font 12 fois 8") == 96
+    assert calculatrice.repondre("45 + 7") == 52
+    assert calculatrice.repondre("100 divisé par 4") == 25
+    assert calculatrice.repondre("2 puissance 10") == 1024
+
+
+def test_calculatrice_refuse_le_non_calcul():
+    import calculatrice
+
+    assert calculatrice.repondre("bonjour ça va") is None
+
+
+def test_calculatrice_est_sure():
+    # calculer() ne doit JAMAIS exécuter autre chose que des maths.
+    import calculatrice
+
+    erreur = False
+    try:
+        calculatrice.calculer("__import__('os')")
+    except Exception:
+        erreur = True
+    assert erreur
+
+
+# --- Mini-CTF ---------------------------------------------------------------
+
+def test_ctf_cesar():
+    import ctf
+
+    assert ctf.cesar("bonjour", 3) == "erqmrxu"
+    assert ctf.cesar("erqmrxu", -3) == "bonjour"
+
+
+def test_ctf_defis_coherents():
+    import base64
+
+    import ctf
+
+    assert len(ctf.DEFIS) >= 4
+    for defi in ctf.DEFIS:
+        assert defi["enonce"] and defi["reponse"] and defi["indice"]
+        assert defi["points"] > 0
+    # Le défi Base64 doit vraiment décoder vers sa réponse.
+    assert base64.b64decode("bW90ZGVwYXNzZQ==").decode() == "motdepasse"
+
+
+# --- Mots de passe ----------------------------------------------------------
+
+def test_motdepasse_generation():
+    import motdepasse
+
+    mdp = motdepasse.generer(16)
+    assert len(mdp) == 16
+    assert any(c.islower() for c in mdp)
+    assert any(c.isupper() for c in mdp)
+    assert any(c.isdigit() for c in mdp)
+
+
+def test_motdepasse_force():
+    import motdepasse
+
+    assert motdepasse.force("123456")[0] == "très faible"
+    niveau, bits, _ = motdepasse.force(motdepasse.generer(20))
+    assert niveau in {"fort", "excellent"}
+    assert bits > 60
+
+
 def test_menu_pointe_vers_des_fichiers_existants():
     import monia
 

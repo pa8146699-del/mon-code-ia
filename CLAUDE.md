@@ -78,6 +78,9 @@ mon-code-ia/
     ├── cyber.py                      # Lesson 10: cybersecurity Q&A assistant (reuses Discussion)
     ├── failles.py                    # Lesson 11: vulnerability-classes Q&A (reuses Discussion)
     ├── analyseur.py                  # Lesson 12: static code security analyzer (stdlib re)
+    ├── calculatrice.py               # Tool: French-language safe arithmetic (ast, no eval)
+    ├── ctf.py                        # Tool: mini Capture-The-Flag challenges (legal practice)
+    ├── motdepasse.py                 # Tool: password generator + strength meter (secrets)
     ├── monia.py                      # Menu launcher (runs any lesson via subprocess)
     ├── test_monia.py                 # Tests (pytest + zero-dep runner)
     └── README.md
@@ -340,10 +343,12 @@ non-linear functions (XOR). Matrices are plain Python lists of lists, so it runs
 anywhere — including Termux on a phone with no `pip install`. Reuses no other
 module; nothing is copied at build time (no APK — it's a CLI/library). Beyond the
 teaching lessons, it grew a set of practical assistants (chatbot, text generator,
-Python/terminal/GitHub helpers, plus an educational cybersecurity/vulnerability
-Q&A pair and a stdlib static code-security analyzer) all built on the same
-`Reseau`/`Discussion` engine (except the analyzer, pure `re`) and reachable from
-one menu (`monia.py`).
+Python/terminal/GitHub helpers, an educational cybersecurity/vulnerability Q&A
+pair, a stdlib static code-security analyzer, and three standalone tools — a safe
+French calculator, a legal mini-CTF, and a password generator/strength meter) all
+reachable from one menu (`monia.py`). The chatbot-style pieces share the same
+`Reseau`/`Discussion` engine; the analyzer is pure `re` and the three tools are
+plain stdlib.
 
 - `reseau.py` — the core. `Reseau(tailles, activation="tanh", sortie="identite",
   seed=None)` builds an MLP from `tailles=[n_in, n_hidden..., n_out]` with
@@ -460,6 +465,21 @@ one menu (`monia.py`).
   `dataguard`: `_masquer()` replaces quoted contents with `***` for the secret rule
   so values never print. Heuristic (regex), so false positives are expected and
   framed as such. Run with a file arg, or no arg for an interactive paste loop.
+- `calculatrice.py`, `ctf.py`, `motdepasse.py` — **three standalone tools** (not
+  `Discussion`-based, their own `__main__` loops, launched from the menu):
+  - `calculatrice.py` answers French math questions by **actually computing**.
+    `normaliser()` maps French words to operators (`fois`→`*`, `racine de N`→
+    `(N) ** 0.5`, …); `calculer()` evaluates **safely via `ast`** (only numbers and
+    `+ - * / // % ** unary`, no names/calls) — deliberately **no `eval()`** (which
+    the analyzer would flag). `repondre(question)` returns the number or `None`.
+  - `ctf.py` is a legal mini Capture-The-Flag: `DEFIS` is a list of challenge dicts
+    (Caesar, reverse, Base64, acrostiche, binary) with `reponse`/`indice`/`points`;
+    `cesar(texte, decalage)` is the shared shift cipher; `jouer(defis)` runs the
+    scored loop. Frames CTF as the legal way to practise hacking.
+  - `motdepasse.py` mirrors `dataguard/toolkit.py` in spirit: `generer(longueur,
+    symboles)` builds a strong password with the `secrets` module (one char per
+    class, Fisher–Yates shuffle via `secrets.randbelow`); `force(mdp)` returns
+    `(niveau, entropy_bits, conseils)`, rejecting common passwords outright.
 - `monia.py` — **the menu launcher**. A module-level `LECONS` dict maps a menu
   key to `(description, fichier)`; `lancer()` runs the chosen script with
   `subprocess.run([sys.executable, ...])` (inheriting stdin/stdout so the launched
@@ -476,7 +496,7 @@ python -m pytest monia/                 # if pytest is installed
 cd monia && python test_monia.py        # zero-dependency fallback runner
 ```
 
-34 tests: weight-matrix shapes, seed reproducibility, activation derivatives,
+41 tests: weight-matrix shapes, seed reproducibility, activation derivatives,
 learning `y = 2x` (and predicting an unseen `x=10`), error decreasing over
 epochs, learning the non-linear XOR, save/load round-trip of the memory, the
 chatbot (`mots()` tokenizing, answering a learned question, the honest "don't
@@ -489,7 +509,9 @@ GitHub assistant (well-formed `CONNAISSANCES_GITHUB`, explaining cloning), the
 cybersecurity assistant (well-formed `CONNAISSANCES_CYBER`, explaining phishing),
 the vulnerability assistant (well-formed `CONNAISSANCES_FAILLES`, explaining SQL
 injection), the static analyzer (finds flaws, masks secrets, stays quiet on clean
-code, scans a folder), and the menu (`LECONS` entries all point to existing files).
+code, scans a folder), the calculator (correct results, `ast` safety, rejects
+non-math), the mini-CTF (Caesar cipher, coherent challenges), the password tools
+(generation, strength), and the menu (`LECONS` entries all point to existing files).
 Same zero-dep runner pattern as the other modules (`tmp_path` via
 `tempfile.TemporaryDirectory`). **No test depends on any external package.**
 
