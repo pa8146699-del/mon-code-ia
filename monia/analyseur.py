@@ -114,6 +114,12 @@ def _afficher(trouvailles, source):
 if __name__ == "__main__":
     if len(sys.argv) > 1:
         chemin = sys.argv[1]
+        if not os.path.isfile(chemin):
+            print(f"❌ Fichier introuvable : {chemin}")
+            print("   Donne le chemin d'un VRAI fichier. Exemples :")
+            print("   python3 analyseur.py discussion.py")
+            print("   python3 analyseur.py ~/mon-code-ia/monia/reseau.py")
+            raise SystemExit(1)
         _afficher(analyser_fichier(chemin), chemin)
     else:
         print("Analyseur de failles — colle une ligne de code, ou tape le nom")
