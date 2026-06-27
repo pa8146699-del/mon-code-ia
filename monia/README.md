@@ -40,6 +40,29 @@ Lancer la démo XOR :
 cd monia && python3 reseau.py
 ```
 
+## Le menu (le plus simple) : `monia.py`
+
+Plus besoin de retenir les noms de fichiers : un seul écran lance tout.
+
+```bash
+cd monia
+python3 monia.py
+```
+```
+=== MonIA — ton IA 100% maison ===
+  Les assistants (pose des questions) :
+    1) Discuter            2) Écrire un texte
+    3) Coder en Python     4) Dépanner le terminal
+    5) GitHub
+  Les leçons (comprendre comment ça marche) :
+    6) Le neurone          7) Apprendre y = 2x
+    8) S'entraîner         9) La mémoire
+   10) Le réseau (XOR)
+    t) Lancer les tests    0) Quitter
+```
+
+Tu tapes un numéro, l'outil se lance ; quand tu le quittes, tu reviens au menu.
+
 ## Les leçons (à lire/lancer dans l'ordre)
 
 | Fichier | Leçon |
@@ -220,15 +243,16 @@ python -m pytest monia/            # si pytest est installé
 cd monia && python3 test_monia.py  # runner zéro-dépendance
 ```
 
-24 tests : formes des poids, reproductibilité de la graine, dérivées des
+25 tests : formes des poids, reproductibilité de la graine, dérivées des
 activations, apprentissage de `y = 2x`, décroissance de l'erreur, apprentissage
 du XOR non-linéaire, sauvegarde/rechargement de la mémoire, le chatbot
 (découpage en mots, réponse à une question apprise, aveu d'ignorance,
 apprentissage en direct, sauvegarde/rechargement), le générateur de texte
 (découpage, apprentissage du vocabulaire, génération, sauvegarde/rechargement),
 l'assistant de code (base de recettes valide, réponse en Python), le dépanneur
-de commandes (base valide, bonne commande renvoyée) et l'assistant GitHub (base
-valide, explique le clonage).
+de commandes (base valide, bonne commande renvoyée), l'assistant GitHub (base
+valide, explique le clonage) et le menu (chaque entrée pointe vers un fichier
+existant).
 
 ## Pourquoi « from scratch » ?
 

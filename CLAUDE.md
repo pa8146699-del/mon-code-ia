@@ -14,7 +14,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - `monappli/` — a second, personal Kivy security app reusing DataGuard, with its own combined "Tout analyser" action and its own APK build.
 - `termux/` — install/launch shell scripts to run the `dataguard/` toolkit on Android via Termux (no APK, no pip — it's a pure-stdlib CLI). `install.sh` installs `python`+`git`, clones the repo, and drops a `dataguard` launcher in `$PREFIX/bin`; `update.sh` is a `git pull` wrapper.
 - `netscan/` — a Kivy GUI (Android) network/port scanner: TCP-connect scan (no root) of a `/24` subnet or a single host. **Self-contained** (stdlib `socket`/`threading` + Kivy) — reuses no other module, so nothing is copied at build time. Its own APK build.
-- `monia/` — a **from-scratch neural network**, 100% home-made and **stdlib-only** (no numpy/torch): a multi-layer perceptron (`reseau.py`) trained by backpropagation, with four progressive French teaching scripts (neuron → learning → training loop → persistent memory). Reuses no other module; runs anywhere, including Termux on a phone.
+- `monia/` — a **from-scratch neural network**, 100% home-made and **stdlib-only** (no numpy/torch): a multi-layer perceptron (`reseau.py`) trained by backpropagation, with progressive French teaching scripts (neuron → learning → training → memory) and a set of practical assistants built on the same engine — a chatbot, a book-learning text generator, a Python-coding helper, a terminal-command helper and a GitHub helper — all reachable from a single menu (`monia.py`). Reuses no other module; runs anywhere, including Termux on a phone.
 
 `jarvis/`, `agentos/`, and `dataguard/` share no code with each other. Reuse-via-copy (single source of truth stays in the origin folder, copies are git-ignored & created at build time):
 - `mobile/` reuses `dataguard/detectors.py` + `dataguard/phishing.py`.
@@ -75,6 +75,7 @@ mon-code-ia/
     ├── codeur.py                     # Lesson 7: Python-coding assistant (reuses Discussion)
     ├── commandes.py                  # Lesson 8: terminal-command helper (reuses Discussion)
     ├── github.py                     # Lesson 9: GitHub Q&A assistant (reuses Discussion)
+    ├── monia.py                      # Menu launcher (runs any lesson via subprocess)
     ├── test_monia.py                 # Tests (pytest + zero-dep runner)
     └── README.md
 ```
@@ -334,7 +335,10 @@ user's first phone experiments (a single linear neuron learning `y = 2x`): a rea
 multi-layer perceptron trained by backpropagation, capable of learning
 non-linear functions (XOR). Matrices are plain Python lists of lists, so it runs
 anywhere — including Termux on a phone with no `pip install`. Reuses no other
-module; nothing is copied at build time (no APK — it's a CLI/library).
+module; nothing is copied at build time (no APK — it's a CLI/library). Beyond the
+teaching lessons, it grew a set of practical assistants (chatbot, text generator,
+Python/terminal/GitHub helpers) all built on the same `Reseau`/`Discussion`
+engine and reachable from one menu (`monia.py`).
 
 - `reseau.py` — the core. `Reseau(tailles, activation="tanh", sortie="identite",
   seed=None)` builds an MLP from `tailles=[n_in, n_hidden..., n_out]` with
@@ -406,6 +410,11 @@ module; nothing is copied at build time (no APK — it's a CLI/library).
   prints command answers as `$ cmd` (detected via `_DEBUTS_COMMANDE`) and
   explanation answers as plain text. Auto-loads/saves `github.json`; live teaching
   via `apprends: question >>> réponse`.
+- `monia.py` — **the menu launcher**. A module-level `LECONS` dict maps a menu
+  key to `(description, fichier)`; `lancer()` runs the chosen script with
+  `subprocess.run([sys.executable, ...])` (inheriting stdin/stdout so the launched
+  tool stays interactive) and returns to the menu when it exits. The single
+  no-name-to-remember entry point for everything above.
 - `memoire.json` / `chat.json` / `ecrivain.json` / `codeur.json` / `commandes.json`
   / `github.json` (written by the matching lesson scripts) and `monia/*.txt`
   (downloaded books) are git-ignored.
@@ -425,8 +434,9 @@ know" path on out-of-vocabulary input, live `apprendre()`, and chatbot
 save/load), the text generator (`jetons()` tokenizing, vocabulary learning,
 generation staying within the learned vocabulary, and save/load), the coding
 assistant (well-formed `CONNAISSANCES_CODE`, answering with Python), the
-command helper (well-formed `COMMANDES`, returning the right shell command), and
-the GitHub assistant (well-formed `CONNAISSANCES_GITHUB`, explaining cloning).
+command helper (well-formed `COMMANDES`, returning the right shell command), the
+GitHub assistant (well-formed `CONNAISSANCES_GITHUB`, explaining cloning), and
+the menu (`LECONS` entries all point to existing files).
 Same zero-dep runner pattern as the other modules (`tmp_path` via
 `tempfile.TemporaryDirectory`). **No test depends on any external package.**
 

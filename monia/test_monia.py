@@ -7,6 +7,7 @@ Ces tests sont 100 % stdlib et n'appellent aucun service externe : ils valident
 directement le réseau de neurones maison (`reseau.py`).
 """
 
+import os
 from pathlib import Path
 
 from discussion import Discussion, mots
@@ -228,6 +229,16 @@ def test_github_explique_le_clonage():
     gh = Discussion(github.CONNAISSANCES_GITHUB, cachees=16, seed=0)
     gh.entrainer(epochs=2000, taux=0.3)
     assert "git clone" in gh.repondre("comment cloner mon projet")
+
+
+# --- Menu principal (leçon 0) -----------------------------------------------
+
+def test_menu_pointe_vers_des_fichiers_existants():
+    import monia
+
+    dossier = os.path.dirname(monia.__file__)
+    for _, fichier in monia.LECONS.values():
+        assert os.path.exists(os.path.join(dossier, fichier)), fichier
 
 
 if __name__ == "__main__":
