@@ -70,6 +70,7 @@ mon-code-ia/
     ├── apprentissage.py              # Lesson 2: learn y = 2x
     ├── entrainement.py               # Lesson 3: training loop with epochs
     ├── memoire.py                    # Lesson 4: save/load weights (JSON memory)
+    ├── discussion.py                 # Lesson 5: bag-of-words chatbot (reuses reseau.py)
     ├── test_monia.py                 # Tests (pytest + zero-dep runner)
     └── README.md
 ```
@@ -349,7 +350,20 @@ module; nothing is copied at build time (no APK — it's a CLI/library).
   (train, save weights to JSON, reload into a fresh network without retraining).
   Lessons 2–4 import `Reseau` from `reseau.py` by bare name (`monia/` is on
   `sys.path[0]` when run directly), same convention as `dataguard/`/`agentos/`.
-- `memoire.json` (weights written by `memoire.py`) is git-ignored.
+- `discussion.py` — **lesson 5, a bag-of-words chatbot** that reuses the network.
+  `Discussion(paires, cachees, seed)` takes `(question, réponse)` pairs, builds a
+  vocabulary (`mots()` tokenizes: lowercased `[a-zà-ÿ0-9]+`) and a list of
+  distinct answers (classes), then a `Reseau([vocab, cachees, classes],
+  activation="tanh", sortie="sigmoide")`. `_encoder()` maps a phrase to a
+  bag-of-words vector; `entrainer()` fits one-hot answer targets; `repondre()`
+  returns the argmax answer (or an honest "I don't know yet" when no question
+  word is in the vocab, or the top score is below `seuil`). `sauvegarder`/`charger`
+  persist everything (pairs + vocab + classes + weights) to one JSON. The default
+  `CONNAISSANCES` knowledge base makes `python3 discussion.py` an interactive
+  French chat loop (same exit keywords as `jarvis`). **Honest framing:** this is a
+  small intent-classifier chatbot, not an LLM — it answers what you teach it.
+- `memoire.json` / `chat.json` (weights written by `memoire.py` / `discussion.py`)
+  are git-ignored.
 
 ### MonIA tests
 
@@ -358,9 +372,11 @@ python -m pytest monia/                 # if pytest is installed
 cd monia && python test_monia.py        # zero-dependency fallback runner
 ```
 
-9 tests: weight-matrix shapes, seed reproducibility, activation derivatives,
+13 tests: weight-matrix shapes, seed reproducibility, activation derivatives,
 learning `y = 2x` (and predicting an unseen `x=10`), error decreasing over
-epochs, learning the non-linear XOR, and save/load round-trip of the memory.
+epochs, learning the non-linear XOR, save/load round-trip of the memory, plus
+the chatbot (`mots()` tokenizing, answering a learned question, the honest
+"don't know" path on out-of-vocabulary input, and chatbot save/load).
 Same zero-dep runner pattern as the other modules (`tmp_path` via
 `tempfile.TemporaryDirectory`). **No test depends on any external package.**
 

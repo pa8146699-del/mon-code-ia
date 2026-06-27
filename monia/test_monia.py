@@ -9,6 +9,7 @@ directement le réseau de neurones maison (`reseau.py`).
 
 from pathlib import Path
 
+from discussion import Discussion, mots
 from reseau import ACTIVATIONS, Reseau
 
 
@@ -89,6 +90,43 @@ def test_sauvegarder_et_charger(tmp_path: Path):
 
     rechargee = Reseau.charger(chemin)
     assert rechargee.predire([7]) == ia.predire([7])
+
+
+# --- Chatbot (leçon 5) ------------------------------------------------------
+
+def test_mots_decoupe_et_minuscule():
+    assert mots("Bonjour, ça VA ?") == ["bonjour", "ça", "va"]
+
+
+def test_chatbot_repond_a_ce_qu_il_a_appris():
+    paires = [
+        ("bonjour", "Salut !"),
+        ("salut", "Salut !"),
+        ("au revoir", "À bientôt."),
+        ("quel est ton nom", "Je m'appelle MonIA."),
+    ]
+    chat = Discussion(paires, seed=0)
+    chat.entrainer(epochs=3000, taux=0.3)
+    assert chat.repondre("bonjour") == "Salut !"
+    assert chat.repondre("quel est ton nom") == "Je m'appelle MonIA."
+
+
+def test_chatbot_avoue_ne_pas_savoir():
+    chat = Discussion([("bonjour", "Salut !")], seed=0)
+    chat.entrainer(epochs=1000, taux=0.3)
+    # Une question dont aucun mot n'est connu du vocabulaire.
+    assert "ne sais pas" in chat.repondre("xyzzy plugh").lower()
+
+
+def test_chatbot_sauvegarder_et_charger(tmp_path: Path):
+    paires = [("bonjour", "Salut !"), ("au revoir", "À bientôt.")]
+    chat = Discussion(paires, seed=0)
+    chat.entrainer(epochs=2000, taux=0.3)
+    chemin = tmp_path / "chat.json"
+    chat.sauvegarder(chemin)
+
+    rechargee = Discussion.charger(chemin)
+    assert rechargee.repondre("bonjour") == chat.repondre("bonjour")
 
 
 if __name__ == "__main__":

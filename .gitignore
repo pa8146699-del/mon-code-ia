@@ -37,5 +37,6 @@ savings/bin/
 netscan/.buildozer/
 netscan/bin/
 
-# Mémoire entraînée de MonIA (poids créés au lancement de memoire.py)
+# Mémoire entraînée de MonIA (poids créés au lancement de memoire.py / discussion.py)
 monia/memoire.json
+monia/chat.json

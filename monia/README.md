@@ -48,6 +48,7 @@ cd monia && python3 reseau.py
 | `apprentissage.py` | **2. Apprendre** `y = 2x` tout seul (poids → 2, biais → 0). |
 | `entrainement.py` | **3. L'entraînement** : voir l'erreur baisser, tester `x=10 → 20`. |
 | `memoire.py` | **4. La mémoire** : sauvegarder/recharger les poids en JSON. |
+| `discussion.py` | **5. Discuter** : un chatbot qui apprend des mots pour répondre. |
 
 ```bash
 cd monia
@@ -55,7 +56,39 @@ python3 cerveau.py
 python3 apprentissage.py
 python3 entrainement.py
 python3 memoire.py
+python3 discussion.py     # discute avec ton IA (tape 'quitter' pour sortir)
 ```
+
+### Le chatbot — `discussion.py`
+
+⚠️ **Honnêteté d'abord** : une IA 100 % maison en Python pur ne peut pas
+« connaître tous les mots » comme ChatGPT (ça demande des milliards de
+paramètres et d'énormes données). **Mais** elle apprend très bien à répondre
+aux questions que **tu lui enseignes**, même reformulées.
+
+Comment ça marche : chaque phrase est découpée en mots (le vocabulaire), puis
+transformée en un vecteur « sac de mots » (1 = mot présent, 0 = absent). Le
+réseau de `reseau.py` apprend à associer ce vecteur à la bonne réponse.
+
+Lui apprendre TES questions : ajoute des couples `("question", "réponse")` dans
+la liste `CONNAISSANCES` de `discussion.py` (donne plusieurs formulations d'une
+même question pour qu'elle généralise mieux), ou passe ta propre liste :
+
+```python
+from discussion import Discussion
+
+chat = Discussion([
+    ("bonjour", "Salut !"),
+    ("quelle est la capitale de la France", "Paris."),
+    ("c'est quoi la capitale française", "Paris."),
+])
+chat.entrainer(epochs=3000, taux=0.3)
+print(chat.repondre("la capitale de la france ?"))   # -> Paris.
+chat.sauvegarder("chat.json")                          # garde ce qu'elle a appris
+```
+
+Si aucun mot de ta question n'est connu, elle répond honnêtement
+« Je ne sais pas encore répondre à ça. Apprends-le moi ! ».
 
 ## Tests
 
@@ -64,9 +97,11 @@ python -m pytest monia/            # si pytest est installé
 cd monia && python3 test_monia.py  # runner zéro-dépendance
 ```
 
-9 tests : formes des poids, reproductibilité de la graine, dérivées des
+13 tests : formes des poids, reproductibilité de la graine, dérivées des
 activations, apprentissage de `y = 2x`, décroissance de l'erreur, apprentissage
-du XOR non-linéaire, sauvegarde/rechargement de la mémoire.
+du XOR non-linéaire, sauvegarde/rechargement de la mémoire, et le chatbot
+(découpage en mots, réponse à une question apprise, aveu d'ignorance,
+sauvegarde/rechargement).
 
 ## Pourquoi « from scratch » ?
 
