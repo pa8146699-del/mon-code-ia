@@ -52,6 +52,7 @@ cd monia && python3 reseau.py
 | `ecrivain.py` | **6. Lire un livre** : apprend tout le vocabulaire d'un texte et écrit. |
 | `codeur.py` | **7. Apprendre à coder** : répond à tes questions avec du code Python. |
 | `commandes.py` | **8. Le dépanneur** : les bonnes commandes du terminal quand tu bloques. |
+| `github.py` | **9. Connaître GitHub** : cloner, envoyer, branches, tokens, pull requests. |
 
 ```bash
 cd monia
@@ -63,6 +64,7 @@ python3 discussion.py     # discute avec ton IA (tape 'quitter' pour sortir)
 python3 ecrivain.py       # lit un texte d'exemple et écrit dans son style
 python3 codeur.py         # pose une question, il répond en Python
 python3 commandes.py      # bloqué dans le terminal ? il te donne la commande
+python3 github.py         # tout ce qu'il faut savoir sur GitHub
 ```
 
 ### Le chatbot — `discussion.py`
@@ -186,6 +188,31 @@ fichiers (`nano`, `cat`, `rm`, `cp`, `mv`), `git` (`pull`, `status`, `add`/`comm
 astuces : `apprends: ce que tu veux faire >>> la commande` (mémoire dans
 `commandes.json`).
 
+### Connaître GitHub — `github.py`
+
+Tout ce qu'il faut savoir sur GitHub (où vit ton projet) : il répond soit par une
+**commande**, soit par une **explication**.
+
+```bash
+python3 github.py
+```
+```
+Toi : comment cloner mon projet
+MonIA — la commande :
+    $ git clone https://github.com/pa8146699-del/mon-code-ia.git
+    (télécharge tout le projet sur ton téléphone)
+
+Toi : c'est quoi une pull request
+MonIA : Une pull request propose de fusionner les changements d'une branche
+        dans une autre ; on la crée et on la relit sur le site github.com.
+```
+
+Il connaît : cloner/récupérer/envoyer (`clone`, `pull`, `add/commit/push`), les
+branches (`branch`, `checkout`), l'historique (`log`), les notions (commit, push,
+pull, dépôt, pull request, `.gitignore`) et **comment se connecter avec un token**
+(GitHub n'accepte plus le mot de passe). Apprends-lui tes astuces avec
+`apprends: ta question >>> ta réponse` (mémoire dans `github.json`).
+
 ## Tests
 
 ```bash
@@ -193,14 +220,15 @@ python -m pytest monia/            # si pytest est installé
 cd monia && python3 test_monia.py  # runner zéro-dépendance
 ```
 
-22 tests : formes des poids, reproductibilité de la graine, dérivées des
+24 tests : formes des poids, reproductibilité de la graine, dérivées des
 activations, apprentissage de `y = 2x`, décroissance de l'erreur, apprentissage
 du XOR non-linéaire, sauvegarde/rechargement de la mémoire, le chatbot
 (découpage en mots, réponse à une question apprise, aveu d'ignorance,
 apprentissage en direct, sauvegarde/rechargement), le générateur de texte
 (découpage, apprentissage du vocabulaire, génération, sauvegarde/rechargement),
-l'assistant de code (base de recettes valide, réponse en Python) et le dépanneur
-de commandes (base valide, bonne commande renvoyée).
+l'assistant de code (base de recettes valide, réponse en Python), le dépanneur
+de commandes (base valide, bonne commande renvoyée) et l'assistant GitHub (base
+valide, explique le clonage).
 
 ## Pourquoi « from scratch » ?
 

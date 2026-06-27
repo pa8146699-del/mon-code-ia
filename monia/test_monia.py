@@ -211,6 +211,25 @@ def test_commandes_donne_la_bonne_commande():
     assert aide.repondre("comment voir mes fichiers").startswith("ls")
 
 
+# --- Assistant GitHub (leçon 9) ---------------------------------------------
+
+def test_github_base_valide():
+    import github
+
+    assert len(github.CONNAISSANCES_GITHUB) >= 15
+    for question, reponse in github.CONNAISSANCES_GITHUB:
+        assert isinstance(question, str) and question
+        assert isinstance(reponse, str) and reponse
+
+
+def test_github_explique_le_clonage():
+    import github
+
+    gh = Discussion(github.CONNAISSANCES_GITHUB, cachees=16, seed=0)
+    gh.entrainer(epochs=2000, taux=0.3)
+    assert "git clone" in gh.repondre("comment cloner mon projet")
+
+
 if __name__ == "__main__":
     import tempfile
 

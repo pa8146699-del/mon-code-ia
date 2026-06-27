@@ -74,6 +74,7 @@ mon-code-ia/
     ├── ecrivain.py                   # Lesson 6: Markov text generator (learns a book)
     ├── codeur.py                     # Lesson 7: Python-coding assistant (reuses Discussion)
     ├── commandes.py                  # Lesson 8: terminal-command helper (reuses Discussion)
+    ├── github.py                     # Lesson 9: GitHub Q&A assistant (reuses Discussion)
     ├── test_monia.py                 # Tests (pytest + zero-dep runner)
     └── README.md
 ```
@@ -397,9 +398,17 @@ module; nothing is copied at build time (no APK — it's a CLI/library).
   to launch MonIA — plus extra phrasing variants pointing at the same answers to
   help the bag-of-words classifier generalize. Auto-loads/saves `commandes.json`;
   live teaching via `apprends: intent >>> command`.
+- `github.py` — **lesson 9, a GitHub Q&A assistant**. Same `Discussion` engine;
+  the `CONNAISSANCES_GITHUB` base mixes **command** answers (`git clone`/`pull`/
+  `push`/`branch`/`checkout`/`log`, keyed off the user's real repo `DEPOT`) and
+  **explanation** answers (commit, push, pull, pull request, repo, token/auth —
+  GitHub no longer accepts a password, use a Personal Access Token). `_afficher()`
+  prints command answers as `$ cmd` (detected via `_DEBUTS_COMMANDE`) and
+  explanation answers as plain text. Auto-loads/saves `github.json`; live teaching
+  via `apprends: question >>> réponse`.
 - `memoire.json` / `chat.json` / `ecrivain.json` / `codeur.json` / `commandes.json`
-  (written by `memoire.py` / `discussion.py` / `ecrivain.py` / `codeur.py` /
-  `commandes.py`) and `monia/*.txt` (downloaded books) are git-ignored.
+  / `github.json` (written by the matching lesson scripts) and `monia/*.txt`
+  (downloaded books) are git-ignored.
 
 ### MonIA tests
 
@@ -415,8 +424,9 @@ chatbot (`mots()` tokenizing, answering a learned question, the honest "don't
 know" path on out-of-vocabulary input, live `apprendre()`, and chatbot
 save/load), the text generator (`jetons()` tokenizing, vocabulary learning,
 generation staying within the learned vocabulary, and save/load), the coding
-assistant (well-formed `CONNAISSANCES_CODE`, answering with Python), and the
-command helper (well-formed `COMMANDES`, returning the right shell command).
+assistant (well-formed `CONNAISSANCES_CODE`, answering with Python), the
+command helper (well-formed `COMMANDES`, returning the right shell command), and
+the GitHub assistant (well-formed `CONNAISSANCES_GITHUB`, explaining cloning).
 Same zero-dep runner pattern as the other modules (`tmp_path` via
 `tempfile.TemporaryDirectory`). **No test depends on any external package.**
 
