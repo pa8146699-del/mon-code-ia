@@ -58,8 +58,15 @@ def afficher_menu():
 
 
 def lancer(fichier):
-    """Lance un script de MonIA et attend qu'il se termine."""
-    subprocess.run([sys.executable, os.path.join(DOSSIER, fichier)])
+    """Lance un script de MonIA et attend qu'il se termine.
+
+    Si tu fais Ctrl+C dans l'outil lancé, on revient simplement au menu
+    (pas de plantage du menu).
+    """
+    try:
+        subprocess.run([sys.executable, os.path.join(DOSSIER, fichier)])
+    except KeyboardInterrupt:
+        print()  # on revient proprement au menu
 
 
 if __name__ == "__main__":
